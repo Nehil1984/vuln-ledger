@@ -2,14 +2,23 @@
 // Licensed under the Apache License, Version 2.0
 // http://www.apache.org/licenses/LICENSE-2.0
 
-export type UserRole = 'admin' | 'user'
+export type UserRole = 'admin' | 'verwalter' | 'techniker' | 'user'
 export type DbBackend = 'lowdb' | 'sqlite'
+
+export type TenantPermission = {
+  tenantId: string
+  canRead: boolean
+  canWrite: boolean
+  canManage: boolean
+  canReport: boolean
+}
 
 export type UserRecord = {
   id: string
   username: string
   passwordHash: string
   role: UserRole
+  tenantIds: string[]
   createdAt: string
 }
 
@@ -24,8 +33,17 @@ export type LicenseRecord = {
   notes: string
 }
 
+export type GroupRecord = {
+  id: string
+  name: string
+  description: string
+  tenantIds: string[]
+  createdAt: string
+}
+
 export type CustomerRecord = {
   id: string
+  groupId?: string
   name: string
   sector: string
   contactName: string
@@ -38,8 +56,8 @@ export type CustomerRecord = {
 export type AssessmentStatus = 'Geplant' | 'Aktiv' | 'Review' | 'Abgeschlossen'
 export type AssessmentRecord = {
   id: string
-  title: string
   customerId: string
+  title: string
   type: string
   mode: string
   status: AssessmentStatus
@@ -53,6 +71,7 @@ export type Severity = 'Critical' | 'High' | 'Medium' | 'Low'
 export type FindingStatus = 'Offen' | 'Bestätigt' | 'In Bearbeitung' | 'Behoben'
 export type FindingRecord = {
   id: string
+  customerId: string
   assessmentId: string
   title: string
   target: string
@@ -65,9 +84,13 @@ export type FindingRecord = {
 }
 
 export type ReportStatus = 'Draft' | 'Internes Review' | 'Freigegeben' | 'Exportiert'
+export type ReportScope = 'tenant' | 'group'
 export type ReportRecord = {
   id: string
-  assessmentId: string
+  scopeType: ReportScope
+  customerId?: string
+  groupId?: string
+  assessmentId?: string
   title: string
   status: ReportStatus
   summary: string
@@ -77,6 +100,7 @@ export type ReportRecord = {
 export type EvidenceType = 'Screenshot' | 'Request' | 'Response' | 'Terminal' | 'Datei' | 'Notiz'
 export type EvidenceRecord = {
   id: string
+  customerId: string
   findingId: string
   assessmentId: string
   type: EvidenceType
@@ -88,6 +112,7 @@ export type EvidenceRecord = {
 export type RetestResult = 'Offen' | 'Teilweise behoben' | 'Behoben' | 'Nicht reproduzierbar'
 export type RetestRecord = {
   id: string
+  customerId: string
   findingId: string
   assessmentId: string
   result: RetestResult
@@ -149,6 +174,7 @@ export type ServerState = {
   config: AppConfig
   license: LicenseRecord
   users: UserRecord[]
+  groups: GroupRecord[]
   customers: CustomerRecord[]
   assessments: AssessmentRecord[]
   findings: FindingRecord[]

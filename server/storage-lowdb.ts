@@ -18,6 +18,7 @@ async function ensureDefaultAdmin() {
     username,
     passwordHash,
     role: 'admin',
+    tenantIds: db.data.customers.map((customer) => customer.id),
     createdAt: new Date().toISOString(),
   })
   await db.write()
@@ -34,7 +35,7 @@ export async function findUserByUsernameLowdb(username: string) {
   return db.data.users.find((user: UserRecord) => user.username.toLowerCase() === username.toLowerCase()) ?? null
 }
 
-export async function createUserLowdb(username: string, password: string, role: UserRole): Promise<UserRecord> {
+export async function createUserLowdb(username: string, password: string, role: UserRole, tenantIds: string[]): Promise<UserRecord> {
   const db = await ensureDefaultAdmin()
   const passwordHash = await bcrypt.hash(password, 10)
   const user: UserRecord = {
@@ -42,6 +43,7 @@ export async function createUserLowdb(username: string, password: string, role: 
     username,
     passwordHash,
     role,
+    tenantIds,
     createdAt: new Date().toISOString(),
   }
   db.data.users.push(user)
