@@ -1,3 +1,7 @@
+// Copyright 2026 Daniel Schuh
+// Licensed under the Apache License, Version 2.0
+// http://www.apache.org/licenses/LICENSE-2.0
+
 import { useMemo, useState } from 'react'
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom'
 import './App.css'
@@ -67,6 +71,7 @@ function App() {
   const [backups, setBackups] = useState<BackupRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [notice, setNotice] = useState('')
 
   const loadDomainData = async () => {
     const [customerRows, assessmentRows, findingRows, reportRows, evidenceRows, retestRows] = await Promise.all([
@@ -132,6 +137,7 @@ function App() {
 
   async function handleLogin(username: string, password: string) {
     setError('')
+    setNotice('')
     setLoading(true)
     try {
       const session = await api<{ user: SessionUser; backend: DbBackend; license: LicenseInfo }>('/api/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) })
@@ -164,7 +170,7 @@ function App() {
         <nav className="nav">{navItems.filter((item) => item.to !== '/admin' || user.role === 'admin').map((item) => <NavLink key={item.to} to={item.to} className={({ isActive }) => `nav__item ${isActive ? 'is-active' : ''}`}><span>{item.label}</span><small>{item.hint}</small></NavLink>)}</nav>
         <div className="sidebar__card"><div className="sidebar__card-title">Session</div><ul><li>{user.username}</li><li>Rolle: {user.role}</li><li>DB: {dbBackend}</li><li>Lizenz: {license?.status ?? '—'}</li></ul><button className="secondary-button top-gap" onClick={() => void handleLogout()}>Logout</button></div>
       </aside>
-      <main className="main">
+      <main className="main">{notice ? <div className="success-box">{notice}</div> : null}
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<DashboardPage customers={customers} assessments={assessments} findings={findings} reports={reports} evidence={evidence} retests={retests} stats={stats} license={license} />} />
@@ -172,7 +178,7 @@ function App() {
           <Route path="/assessments" element={<AssessmentsPage customers={customers} assessments={assessments} onAddAssessment={async (assessment) => { const created = await api<Assessment>('/api/assessments', { method: 'POST', body: JSON.stringify(assessment) }); setAssessments((current) => [created, ...current]) }} onStatusChange={async (assessmentId, status) => { const updated = await api<Assessment>(`/api/assessments/${assessmentId}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }); setAssessments((current) => current.map((item) => item.id === assessmentId ? updated : item)) }} />} />
           <Route path="/findings" element={<FindingsPage assessments={assessments} findings={findings} evidence={evidence} retests={retests} onAddFinding={async (finding) => { const created = await api<Finding>('/api/findings', { method: 'POST', body: JSON.stringify(finding) }); setFindings((current) => [created, ...current]) }} onStatusChange={async (findingId, status) => { const updated = await api<Finding>(`/api/findings/${findingId}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }); setFindings((current) => current.map((item) => item.id === findingId ? updated : item)) }} onAddEvidence={async (entry) => { if (entry.createdAt) { setEvidence((current) => [entry, ...current]); return } const created = await api<Evidence>('/api/evidence', { method: 'POST', body: JSON.stringify(entry) }); setEvidence((current) => [created, ...current]) }} onAddRetest={async (entry) => { const created = await api<Retest>('/api/retests', { method: 'POST', body: JSON.stringify(entry) }); setRetests((current) => [created, ...current]) }} />} />
           <Route path="/reports" element={<ReportsPage reports={reports} assessments={assessments} findings={findings} onAddReport={async (report) => { const created = await api<Report>('/api/reports', { method: 'POST', body: JSON.stringify(report) }); setReports((current) => [created, ...current]) }} onStatusChange={async (reportId, status) => { const updated = await api<Report>(`/api/reports/${reportId}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }); setReports((current) => current.map((item) => item.id === reportId ? updated : item)) }} />} />
-          {user.role === 'admin' ? <Route path="/admin" element={<AdminPage users={adminUsers} dbBackend={dbBackend} backupConfig={backupConfig} backups={backups} license={license} onRefresh={loadAdminData} onUserCreated={(row) => setAdminUsers((current) => [row, ...current])} onDbBackendChanged={setDbBackend} onBackupConfigChanged={setBackupConfig} onBackupsChanged={setBackups} onLicenseChanged={setLicense} />} /> : null}
+          {user.role === 'admin' ? <Route path="/admin" element={<AdminPage users={adminUsers} dbBackend={dbBackend} backupConfig={backupConfig} backups={backups} license={license} onRefresh={loadAdminData} onUserCreated={(row) => setAdminUsers((current) => [row, ...current])} onDbBackendChanged={(backend) => { setDbBackend(backend); setNotice(`Datenbank-Backend aktiv: ${backend}`) }} onBackupConfigChanged={setBackupConfig} onBackupsChanged={setBackups} onLicenseChanged={setLicense} />} /> : null}
         </Routes>
       </main>
     </div>

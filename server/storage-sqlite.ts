@@ -1,3 +1,7 @@
+// Copyright 2026 Daniel Schuh
+// Licensed under the Apache License, Version 2.0
+// http://www.apache.org/licenses/LICENSE-2.0
+
 import fs from 'node:fs'
 import path from 'node:path'
 import Database from 'better-sqlite3'

@@ -33,6 +33,7 @@ import {
   createRetest,
   createUser,
   getDbBackend,
+  migrateDbBackend,
   getLicense,
   listAssessments,
   listCustomers,
@@ -41,7 +42,6 @@ import {
   listReports,
   listRetests,
   listUsers,
-  setDbBackend,
   updateAssessmentStatus,
   updateFindingStatus,
   updateLicense,
@@ -93,7 +93,7 @@ app.get('/api/auth/me', (req, res) => { if (!req.session.user) return res.status
 app.get('/api/admin/users', requireAuth, requireAdmin, async (_req, res) => { const users = await listUsers(); res.json(users.map((user) => ({ id: user.id, username: user.username, role: user.role, createdAt: user.createdAt }))) })
 app.post('/api/admin/users', requireAuth, requireAdmin, async (req, res) => { const parsed = createUserSchema.safeParse(req.body); if (!parsed.success) return res.status(400).json({ message: 'Ungültige Benutzerdaten' }); const user = await createUser(parsed.data.username, parsed.data.password, parsed.data.role); res.status(201).json({ id: user.id, username: user.username, role: user.role, createdAt: user.createdAt }) })
 app.get('/api/admin/db-config', requireAuth, requireAdmin, (_req, res) => res.json({ dbBackend: getDbBackend() }))
-app.post('/api/admin/db-config', requireAuth, requireAdmin, (req, res) => { const parsed = dbSchema.safeParse(req.body); if (!parsed.success) return res.status(400).json({ message: 'Ungültiges DB-Backend' }); setDbBackend(parsed.data.dbBackend as DbBackend); res.json({ ok: true, dbBackend: getDbBackend() }) })
+app.post('/api/admin/db-config', requireAuth, requireAdmin, async (req, res) => { const parsed = dbSchema.safeParse(req.body); if (!parsed.success) return res.status(400).json({ message: 'Ungültiges DB-Backend' }); const result = await migrateDbBackend(parsed.data.dbBackend as DbBackend); res.json({ ...result, dbBackend: getDbBackend() }) })
 app.get('/api/admin/license', requireAuth, requireAdmin, (_req, res) => res.json(getLicense()))
 app.post('/api/admin/license', requireAuth, requireAdmin, (req, res) => { const parsed = licenseSchema.safeParse(req.body); if (!parsed.success) return res.status(400).json({ message: 'Ungültige Lizenzdaten' }); res.json(updateLicense(parsed.data)) })
 app.get('/api/admin/backups/config', requireAuth, requireAdmin, (_req, res) => { const cfg = readBackupConfig(); res.json({ backupDir: cfg.backupDir, retention: cfg.retention, encrypt: cfg.encrypt, passwordHint: cfg.passwordHint || '', ...readBackupStatus() }) })

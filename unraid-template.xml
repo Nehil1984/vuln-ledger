@@ -1,3 +1,5 @@
+<!-- Copyright 2026 Daniel Schuh | Licensed under Apache License 2.0 | http://www.apache.org/licenses/LICENSE-2.0 -->
+
 <?xml version="1.0"?>
 <Container version="2">
   <Name>VulnLedger</Name>
@@ -11,7 +13,7 @@
   <Project>https://github.com/Nehil1984/vuln-ledger</Project>
   <Overview>VulnLedger ist eine Penetration-Testing-App zur strukturierten Dokumentation von Scopes, Findings, Evidenzen, Bewertungen und Berichten.</Overview>
   <Category>Security: Tools</Category>
-  <WebUI>http://[IP]:[PORT:8080]</WebUI>
+  <WebUI>http://[IP]:[PORT:3000]</WebUI>
   <TemplateURL/>
   <Icon>https://raw.githubusercontent.com/Nehil1984/vuln-ledger/master/public/unraid-icon.png</Icon>
   <ExtraParams/>
@@ -25,8 +27,8 @@
     <Mode>bridge</Mode>
     <Publish>
       <Port>
-        <HostPort>8080</HostPort>
-        <ContainerPort>80</ContainerPort>
+        <HostPort>3000</HostPort>
+        <ContainerPort>3000</ContainerPort>
         <Protocol>tcp</Protocol>
       </Port>
     </Publish>
