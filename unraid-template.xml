@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>VulnLedger</Name>
+  <Repository>ghcr.io/nehil1984/vuln-ledger:latest</Repository>
+  <Registry>https://ghcr.io</Registry>
+  <Network>bridge</Network>
+  <MyIP/>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/Nehil1984/vuln-ledger</Support>
+  <Project>https://github.com/Nehil1984/vuln-ledger</Project>
+  <Overview>VulnLedger ist eine Penetration-Testing-App zur strukturierten Dokumentation von Scopes, Findings, Evidenzen, Bewertungen und Berichten.</Overview>
+  <Category>Security: Tools</Category>
+  <WebUI>http://[IP]:[PORT:8080]</WebUI>
+  <TemplateURL/>
+  <Icon>https://raw.githubusercontent.com/Nehil1984/vuln-ledger/master/public/unraid-icon.png</Icon>
+  <ExtraParams/>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled/>
+  <DonateText/>
+  <DonateLink/>
+  <Description>Dokumentations- und Reporting-App für Penetration Tests, Red-Team-Assessments und Schwachstellenmanagement.</Description>
+  <Networking>
+    <Mode>bridge</Mode>
+    <Publish>
+      <Port>
+        <HostPort>8080</HostPort>
+        <ContainerPort>80</ContainerPort>
+        <Protocol>tcp</Protocol>
+      </Port>
+    </Publish>
+  </Networking>
+</Container>
