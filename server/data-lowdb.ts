@@ -4,9 +4,10 @@
 
 import fs from 'node:fs'
 import path from 'node:path'
+import bcrypt from 'bcryptjs'
 import { Low } from 'lowdb'
 import { JSONFile } from 'lowdb/node'
-import type { AssessmentRecord, CustomerRecord, EvidenceRecord, FindingRecord, LicenseRecord, ReportRecord, RetestRecord, ServerState } from './models.js'
+import type { AssessmentRecord, CustomerRecord, EvidenceRecord, FindingRecord, LicenseRecord, ReportRecord, RetestRecord, ServerState, UserRecord } from './models.js'
 
 const dataDir = path.resolve(process.cwd(), 'data')
 const filePath = path.join(dataDir, 'vulnledger.lowdb.json')
@@ -52,10 +53,12 @@ const defaultRetests: RetestRecord[] = [
   { id: 'rt1', findingId: 'VL-2026-0003', assessmentId: 'a2', result: 'Teilweise behoben', tester: 'Daniel Schuh', notes: 'MFA wurde ergänzt, Passwort-Policy jedoch noch nicht vollständig verschärft.', createdAt: new Date().toISOString() },
 ]
 
+const defaultUsers: UserRecord[] = []
+
 const defaultData: ServerState = {
   config: { dbBackend: 'lowdb' },
   license: defaultLicense,
-  users: [],
+  users: defaultUsers,
   customers: defaultCustomers,
   assessments: defaultAssessments,
   findings: defaultFindings,
@@ -66,6 +69,14 @@ const defaultData: ServerState = {
 
 let db: Low<ServerState> | null = null
 
+async function ensureDefaultAdmin(data: ServerState) {
+  if (data.users.length > 0) return
+  const username = process.env.ADMIN_USERNAME || 'admin'
+  const password = process.env.ADMIN_PASSWORD || 'admin123!'
+  const passwordHash = await bcrypt.hash(password, 10)
+  data.users.push({ id: 'u-admin', username, passwordHash, role: 'admin', createdAt: new Date().toISOString() })
+}
+
 export async function getDataDb() {
   if (db) return db
   fs.mkdirSync(dataDir, { recursive: true })
@@ -74,6 +85,8 @@ export async function getDataDb() {
   await db.read()
   db.data ||= structuredClone(defaultData)
   db.data.license ||= structuredClone(defaultLicense)
+  db.data.users ||= structuredClone(defaultUsers)
+  await ensureDefaultAdmin(db.data)
   db.data.customers ||= structuredClone(defaultCustomers)
   db.data.assessments ||= structuredClone(defaultAssessments)
   db.data.findings ||= structuredClone(defaultFindings)
