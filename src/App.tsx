@@ -121,23 +121,29 @@ function App() {
     setBackups(backupRows)
   }
 
-  const loadSession = async () => {
-    try {
-      const session = await api<{ user: SessionUser; backend: DbBackend }>('/api/auth/me')
-      setUser(session.user)
-      setDbBackend(session.backend)
-      await Promise.all([loadDomainData(), canSeeAdmin(session.user.role) ? loadAdminData() : Promise.resolve()])
-      setError('')
-    } catch {
-      setUser(null)
-    } finally {
-      setLoading(false)
-    }
-  }
+  useEffect(() => {
+    let cancelled = false
 
-  if (loading && !user) {
+    async function loadSession() {
+      try {
+        const session = await api<{ user: SessionUser; backend: DbBackend }>('/api/auth/me')
+        if (cancelled) return
+        setUser(session.user)
+        setDbBackend(session.backend)
+        await Promise.all([loadDomainData(), canSeeAdmin(session.user.role) ? loadAdminData() : Promise.resolve()])
+        if (cancelled) return
+        setError('')
+      } catch {
+        if (cancelled) return
+        setUser(null)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
     void loadSession()
-  }
+    return () => { cancelled = true }
+  }, [])
 
   const tenantNameById = useMemo(() => Object.fromEntries(customers.map((customer) => [customer.id, customer.name])), [customers])
   const groupNameById = useMemo(() => Object.fromEntries(groups.map((group) => [group.id, group.name])), [groups])

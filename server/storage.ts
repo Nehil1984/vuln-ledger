@@ -5,6 +5,7 @@
 import bcrypt from 'bcryptjs'
 import { readDbBackend, writeDbBackend } from './db-config.js'
 import { getDataDb } from './data-lowdb.js'
+import { readLicense, writeLicense } from './license.js'
 import type {
   AssessmentRecord,
   CustomerRecord,
@@ -18,6 +19,30 @@ import type {
   UserRecord,
   UserRole,
 } from './models.js'
+import {
+  createAssessmentSqlite,
+  createCustomerSqlite,
+  createEvidenceSqlite,
+  createFindingSqlite,
+  createGroupSqlite,
+  createReportSqlite,
+  createRetestSqlite,
+  createUserSqlite,
+  findUserByUsernameSqlite,
+  listAssessmentsSqlite,
+  listCustomersSqlite,
+  listEvidenceSqlite,
+  listFindingsSqlite,
+  listGroupsSqlite,
+  listReportsSqlite,
+  listRetestsSqlite,
+  listUsersSqlite,
+  updateAssessmentStatusSqlite,
+  updateCustomerSqlite,
+  updateFindingStatusSqlite,
+  updateGroupSqlite,
+  updateReportStatusSqlite,
+} from './storage-sqlite.js'
 
 export type GroupInput = {
   id: string
@@ -25,7 +50,6 @@ export type GroupInput = {
   description: string
   tenantIds: string[]
 }
-import { readLicense, writeLicense } from './license.js'
 
 export type EvidenceWithFile = EvidenceRecord & { fileName?: string; filePath?: string; contentType?: string }
 
@@ -34,16 +58,43 @@ export function setDbBackend(dbBackend: DbBackend) { writeDbBackend(dbBackend) }
 export function getLicense(): LicenseRecord { return readLicense() }
 export function updateLicense(next: Partial<LicenseRecord>) { return writeLicense(next) }
 
-export async function listUsers(): Promise<UserRecord[]> { return (await getDataDb()).data.users }
-export async function listGroups(): Promise<GroupRecord[]> { return (await getDataDb()).data.groups }
-export async function listCustomers(): Promise<CustomerRecord[]> { return (await getDataDb()).data.customers }
-export async function listAssessments(): Promise<AssessmentRecord[]> { return (await getDataDb()).data.assessments }
-export async function listFindings(): Promise<FindingRecord[]> { return (await getDataDb()).data.findings }
-export async function listReports(): Promise<ReportRecord[]> { return (await getDataDb()).data.reports }
-export async function listEvidence(): Promise<EvidenceWithFile[]> { return (await getDataDb()).data.evidence }
-export async function listRetests(): Promise<RetestRecord[]> { return (await getDataDb()).data.retests }
+const isSqlite = () => readDbBackend() === 'sqlite'
+
+export async function listUsers(): Promise<UserRecord[]> {
+  if (isSqlite()) return listUsersSqlite()
+  return (await getDataDb()).data.users
+}
+export async function listGroups(): Promise<GroupRecord[]> {
+  if (isSqlite()) return listGroupsSqlite()
+  return (await getDataDb()).data.groups
+}
+export async function listCustomers(): Promise<CustomerRecord[]> {
+  if (isSqlite()) return listCustomersSqlite()
+  return (await getDataDb()).data.customers
+}
+export async function listAssessments(): Promise<AssessmentRecord[]> {
+  if (isSqlite()) return listAssessmentsSqlite()
+  return (await getDataDb()).data.assessments
+}
+export async function listFindings(): Promise<FindingRecord[]> {
+  if (isSqlite()) return listFindingsSqlite()
+  return (await getDataDb()).data.findings
+}
+export async function listReports(): Promise<ReportRecord[]> {
+  if (isSqlite()) return listReportsSqlite()
+  return (await getDataDb()).data.reports
+}
+export async function listEvidence(): Promise<EvidenceWithFile[]> {
+  if (isSqlite()) return listEvidenceSqlite()
+  return (await getDataDb()).data.evidence
+}
+export async function listRetests(): Promise<RetestRecord[]> {
+  if (isSqlite()) return listRetestsSqlite()
+  return (await getDataDb()).data.retests
+}
 
 export async function findUserByUsername(username: string): Promise<UserRecord | null> {
+  if (isSqlite()) return findUserByUsernameSqlite(username)
   return (await getDataDb()).data.users.find((user) => user.username.toLowerCase() === username.toLowerCase()) ?? null
 }
 
@@ -55,6 +106,7 @@ export async function verifyUser(username: string, password: string): Promise<Us
 }
 
 export async function createUser(input: { username: string; password: string; role: UserRole; tenantIds: string[] }) {
+  if (isSqlite()) return createUserSqlite(input.username, input.password, input.role, input.tenantIds)
   const db = await getDataDb()
   const passwordHash = await bcrypt.hash(input.password, 10)
   const user: UserRecord = { id: `u-${Date.now()}`, username: input.username, passwordHash, role: input.role, tenantIds: input.tenantIds, createdAt: new Date().toISOString() }
@@ -64,6 +116,7 @@ export async function createUser(input: { username: string; password: string; ro
 }
 
 export async function createGroup(input: GroupInput) {
+  if (isSqlite()) return createGroupSqlite(input)
   const db = await getDataDb()
   const row: GroupRecord = { ...input, createdAt: new Date().toISOString() }
   db.data.groups.unshift(row)
@@ -72,6 +125,7 @@ export async function createGroup(input: GroupInput) {
 }
 
 export async function updateGroup(input: GroupRecord) {
+  if (isSqlite()) return updateGroupSqlite(input)
   const db = await getDataDb()
   const row = db.data.groups.find((group) => group.id === input.id)
   if (!row) return null
@@ -81,6 +135,7 @@ export async function updateGroup(input: GroupRecord) {
 }
 
 export async function createCustomer(input: Omit<CustomerRecord, 'createdAt'>) {
+  if (isSqlite()) return createCustomerSqlite(input)
   const db = await getDataDb()
   const row: CustomerRecord = { ...input, createdAt: new Date().toISOString() }
   db.data.customers.unshift(row)
@@ -89,6 +144,7 @@ export async function createCustomer(input: Omit<CustomerRecord, 'createdAt'>) {
 }
 
 export async function updateCustomer(input: CustomerRecord) {
+  if (isSqlite()) return updateCustomerSqlite(input)
   const db = await getDataDb()
   const row = db.data.customers.find((customer) => customer.id === input.id)
   if (!row) return null
@@ -98,6 +154,7 @@ export async function updateCustomer(input: CustomerRecord) {
 }
 
 export async function createAssessment(input: Omit<AssessmentRecord, 'createdAt'>) {
+  if (isSqlite()) return createAssessmentSqlite(input)
   const db = await getDataDb()
   const row: AssessmentRecord = { ...input, createdAt: new Date().toISOString() }
   db.data.assessments.unshift(row)
@@ -106,6 +163,7 @@ export async function createAssessment(input: Omit<AssessmentRecord, 'createdAt'
 }
 
 export async function updateAssessmentStatus(id: string, status: AssessmentRecord['status']) {
+  if (isSqlite()) return updateAssessmentStatusSqlite(id, status)
   const db = await getDataDb()
   const row = db.data.assessments.find((item) => item.id === id)
   if (!row) return null
@@ -115,6 +173,7 @@ export async function updateAssessmentStatus(id: string, status: AssessmentRecor
 }
 
 export async function createFinding(input: Omit<FindingRecord, 'createdAt'>) {
+  if (isSqlite()) return createFindingSqlite(input)
   const db = await getDataDb()
   const row: FindingRecord = { ...input, createdAt: new Date().toISOString() }
   db.data.findings.unshift(row)
@@ -123,6 +182,7 @@ export async function createFinding(input: Omit<FindingRecord, 'createdAt'>) {
 }
 
 export async function updateFindingStatus(id: string, status: FindingRecord['status']) {
+  if (isSqlite()) return updateFindingStatusSqlite(id, status)
   const db = await getDataDb()
   const row = db.data.findings.find((item) => item.id === id)
   if (!row) return null
@@ -132,6 +192,7 @@ export async function updateFindingStatus(id: string, status: FindingRecord['sta
 }
 
 export async function createReport(input: Omit<ReportRecord, 'createdAt'>) {
+  if (isSqlite()) return createReportSqlite(input)
   const db = await getDataDb()
   const row: ReportRecord = { ...input, createdAt: new Date().toISOString() }
   db.data.reports.unshift(row)
@@ -140,6 +201,7 @@ export async function createReport(input: Omit<ReportRecord, 'createdAt'>) {
 }
 
 export async function updateReportStatus(id: string, status: ReportRecord['status']) {
+  if (isSqlite()) return updateReportStatusSqlite(id, status)
   const db = await getDataDb()
   const row = db.data.reports.find((item) => item.id === id)
   if (!row) return null
@@ -149,6 +211,7 @@ export async function updateReportStatus(id: string, status: ReportRecord['statu
 }
 
 export async function createEvidence(input: Omit<EvidenceWithFile, 'createdAt'>) {
+  if (isSqlite()) return createEvidenceSqlite(input)
   const db = await getDataDb()
   const row: EvidenceWithFile = { ...input, createdAt: new Date().toISOString() }
   db.data.evidence.unshift(row)
@@ -157,6 +220,7 @@ export async function createEvidence(input: Omit<EvidenceWithFile, 'createdAt'>)
 }
 
 export async function createRetest(input: Omit<RetestRecord, 'createdAt'>) {
+  if (isSqlite()) return createRetestSqlite(input)
   const db = await getDataDb()
   const row: RetestRecord = { ...input, createdAt: new Date().toISOString() }
   db.data.retests.unshift(row)
@@ -166,7 +230,7 @@ export async function createRetest(input: Omit<RetestRecord, 'createdAt'>) {
 
 export async function migrateDbBackend(target: DbBackend) {
   writeDbBackend(target)
-  return { ok: true, backend: target, migrated: true }
+  return { ok: true, dbBackend: target, migrated: true }
 }
 
 export function canReadTenant(user: UserRecord, tenantId: string) {
