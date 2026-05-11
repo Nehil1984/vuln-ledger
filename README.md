@@ -52,6 +52,12 @@ docker run -p 8080:80 vuln-ledger
 
 Die Datei `unraid-template.xml` ist als Startpunkt für die Einbindung in Unraid vorbereitet.
 
+## Architektur-Dokumente
+
+- `docs/architecture.md` – fachliches Datenmodell und MVP-Struktur
+- `docs/page-map.md` – geplanter Seitenbaum
+- `docs/roadmap.md` – empfohlene Umsetzungsreihenfolge
+
 ## Roadmap – empfohlene nächste Schritte
 
 1. Datenmodell für Assessments, Findings und Evidenzen definieren

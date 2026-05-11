@@ -1,0 +1,26 @@
+# VulnLedger – Seitenbaum
+
+- Dashboard
+- Kunden
+  - Kundenliste
+  - Kundendetail
+- Assessments
+  - Assessment-Liste
+  - Assessment-Detail
+    - Übersicht
+    - Scope
+    - Rules of Engagement
+    - Findings
+    - Evidence
+    - Report
+    - Retest
+- Findings
+  - globale Liste
+  - Finding-Detail
+- Reports
+  - Berichtsliste
+  - Berichtsdetail
+- Einstellungen
+  - Standardtexte
+  - Finding-Vorlagen
+  - Bewertungsmodelle
