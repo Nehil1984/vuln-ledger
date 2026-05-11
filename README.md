@@ -46,15 +46,18 @@ npm run server
 
 ## Aktueller Auth-/DB-Stand
 
-- Login ist serverseitig angelegt
+- Login ist serverseitig und im Frontend angebunden
+- Session-Check, Logout und Rollenanzeige sind integriert
 - Rollenmodell: `admin` und `user`
 - Standard-DB-Backend: `lowdb`
 - Optional umschaltbar auf `sqlite`
+- Lizenzverwaltung ist eingebaut
+- Backup-Logik ist analog zum PrivaShield-Muster integriert
 - Standard-Admin beim Erststart:
   - Benutzername: `admin`
   - Passwort: `admin123!`
 
-Empfehlung: Zugangsdaten und Session-Secret im Deployment sofort überschreiben.
+Empfehlung: Zugangsdaten, Session-Secret und optionales Backup-Kennwort im Deployment sofort überschreiben.
 
 ## Build
 
@@ -69,7 +72,10 @@ npm run build:full
 
 ```bash
 docker build -t vuln-ledger .
-docker run -p 3000:3000 vuln-ledger
+docker run -p 3000:3000 \
+  -e SESSION_SECRET='replace-me' \
+  -e VULNLEDGER_BACKUP_PASSWORD='optional-backup-password' \
+  vuln-ledger
 ```
 
 ## Unraid
