@@ -24,6 +24,9 @@ Die App soll Prüfteams dabei helfen,
 ## Tech-Startpunkt
 
 - React + TypeScript + Vite
+- Express-Backend für Auth und Admin-Funktionen
+- lowdb als Standard-Datenhaltung
+- SQLite als auswählbares alternatives Backend
 - Dockerfile für Container-Build
 - GitHub Actions Workflow für GHCR
 - Unraid Template inkl. Icon
@@ -35,17 +38,38 @@ npm install
 npm run dev
 ```
 
+Backend lokal starten:
+
+```bash
+npm run server
+```
+
+## Aktueller Auth-/DB-Stand
+
+- Login ist serverseitig angelegt
+- Rollenmodell: `admin` und `user`
+- Standard-DB-Backend: `lowdb`
+- Optional umschaltbar auf `sqlite`
+- Standard-Admin beim Erststart:
+  - Benutzername: `admin`
+  - Passwort: `admin123!`
+
+Empfehlung: Zugangsdaten und Session-Secret im Deployment sofort überschreiben.
+
 ## Build
 
 ```bash
 npm run build
+npm run build:server
+# oder komplett
+npm run build:full
 ```
 
 ## Docker
 
 ```bash
 docker build -t vuln-ledger .
-docker run -p 8080:80 vuln-ledger
+docker run -p 3000:3000 vuln-ledger
 ```
 
 ## Unraid
