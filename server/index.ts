@@ -8,6 +8,7 @@
 
 import express, { type Request, type Response } from 'express'
 import session from 'express-session'
+import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { z } from 'zod'
@@ -46,31 +47,24 @@ import {
   updateLicense,
   updateReportStatus,
   verifyUser,
+  type EvidenceWithFile,
 } from './storage.js'
 import type { AssessmentRecord, DbBackend, FindingRecord, ReportRecord, UserRole } from './models.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const app = express()
+const evidenceDir = path.resolve(process.cwd(), 'data', 'evidence')
+fs.mkdirSync(evidenceDir, { recursive: true })
 
 app.use(express.json({ limit: '10mb' }))
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'vulnledger-dev-session-secret-change-me',
-  resave: false,
-  saveUninitialized: false,
-  cookie: { httpOnly: true, sameSite: 'lax', secure: false, maxAge: 8 * 60 * 60 * 1000 },
-}))
+app.use(session({ secret: process.env.SESSION_SECRET || 'vulnledger-dev-session-secret-change-me', resave: false, saveUninitialized: false, cookie: { httpOnly: true, sameSite: 'lax', secure: false, maxAge: 8 * 60 * 60 * 1000 } }))
 
 type SessionUser = { id: string; username: string; role: UserRole }
 type ErrorWithMessage = { message?: string }
-function getErrorMessage(error: unknown, fallback: string) {
-  if (typeof error === 'object' && error && 'message' in error) return (error as ErrorWithMessage).message || fallback
-  return fallback
-}
+function getErrorMessage(error: unknown, fallback: string) { if (typeof error === 'object' && error && 'message' in error) return (error as ErrorWithMessage).message || fallback; return fallback }
 
-declare module 'express-session' {
-  interface SessionData { user?: SessionUser }
-}
+declare module 'express-session' { interface SessionData { user?: SessionUser } }
 
 const loginSchema = z.object({ username: z.string().min(1), password: z.string().min(1) })
 const createUserSchema = z.object({ username: z.string().min(3), password: z.string().min(8), role: z.enum(['admin', 'user']) })
@@ -82,7 +76,7 @@ const customerSchema = z.object({ id: z.string().min(1), name: z.string().min(1)
 const assessmentSchema = z.object({ id: z.string().min(1), title: z.string().min(1), customerId: z.string().min(1), type: z.string().min(1), mode: z.string().min(1), status: z.enum(['Geplant', 'Aktiv', 'Review', 'Abgeschlossen']), scope: z.string().min(1), leadTester: z.string().min(1), rulesOfEngagement: z.string().min(1) })
 const findingSchema = z.object({ id: z.string().min(1), assessmentId: z.string().min(1), title: z.string().min(1), target: z.string().min(1), severity: z.enum(['Critical', 'High', 'Medium', 'Low']), status: z.enum(['Offen', 'Bestätigt', 'In Bearbeitung', 'Behoben']), cvssScore: z.string().optional().default(''), cwe: z.string().optional().default(''), recommendation: z.string().min(1) })
 const reportSchema = z.object({ id: z.string().min(1), assessmentId: z.string().min(1), title: z.string().min(1), status: z.enum(['Draft', 'Internes Review', 'Freigegeben', 'Exportiert']), summary: z.string().min(1) })
-const evidenceSchema = z.object({ id: z.string().min(1), findingId: z.string().min(1), assessmentId: z.string().min(1), type: z.enum(['Screenshot', 'Request', 'Response', 'Terminal', 'Datei', 'Notiz']), title: z.string().min(1), content: z.string().min(1) })
+const evidenceSchema = z.object({ id: z.string().min(1), findingId: z.string().min(1), assessmentId: z.string().min(1), type: z.enum(['Screenshot', 'Request', 'Response', 'Terminal', 'Datei', 'Notiz']), title: z.string().min(1), content: z.string().min(1), fileName: z.string().optional(), filePath: z.string().optional(), contentType: z.string().optional() })
 const retestSchema = z.object({ id: z.string().min(1), findingId: z.string().min(1), assessmentId: z.string().min(1), result: z.enum(['Offen', 'Teilweise behoben', 'Behoben', 'Nicht reproduzierbar']), tester: z.string().min(1), notes: z.string().min(1) })
 const assessmentStatusSchema = z.object({ status: z.enum(['Geplant', 'Aktiv', 'Review', 'Abgeschlossen']) })
 const findingStatusSchema = z.object({ status: z.enum(['Offen', 'Bestätigt', 'In Bearbeitung', 'Behoben']) })
@@ -122,8 +116,11 @@ app.post('/api/reports', requireAuth, async (req, res) => { const parsed = repor
 app.patch('/api/reports/:id/status', requireAuth, async (req, res) => { const parsed = reportStatusSchema.safeParse(req.body); if (!parsed.success) return res.status(400).json({ message: 'Ungültiger Report-Status' }); try { const reportId = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id; const updated = await updateReportStatus(reportId, parsed.data.status as ReportRecord['status']); if (!updated) return res.status(404).json({ message: 'Report nicht gefunden' }); res.json(updated) } catch (error: unknown) { res.status(400).json({ message: getErrorMessage(error, 'Report-Status konnte nicht aktualisiert werden') }) } })
 app.get('/api/evidence', requireAuth, async (_req, res) => { try { res.json(await listEvidence()) } catch (error: unknown) { res.status(400).json({ message: getErrorMessage(error, 'Evidence konnte nicht geladen werden') }) } })
 app.post('/api/evidence', requireAuth, async (req, res) => { const parsed = evidenceSchema.safeParse(req.body); if (!parsed.success) return res.status(400).json({ message: 'Ungültige Evidence-Daten' }); try { res.status(201).json(await createEvidence(parsed.data)) } catch (error: unknown) { res.status(400).json({ message: getErrorMessage(error, 'Evidence konnte nicht gespeichert werden') }) } })
+type EvidenceUploadRequest = Request & { body: Buffer; query: Record<string, string | undefined> }
+app.post('/api/evidence/upload', requireAuth, express.raw({ type: '*/*', limit: '50mb' }), async (req: EvidenceUploadRequest, res: Response) => { try { const findingId = String(req.query.findingId || '').trim(); const assessmentId = String(req.query.assessmentId || '').trim(); const title = String(req.query.title || '').trim(); const type = String(req.query.type || 'Datei').trim(); if (!findingId || !assessmentId || !title) return res.status(400).json({ message: 'findingId, assessmentId und title sind erforderlich' }); if (!req.body || !Buffer.isBuffer(req.body) || req.body.length === 0) return res.status(400).json({ message: 'Keine Datei hochgeladen' }); const originalName = String(req.query.fileName || 'evidence.bin').trim(); const safeName = originalName.replace(/[^a-zA-Z0-9._-]/g, '_'); const evidenceId = `e${Date.now()}`; const storedPath = path.join(evidenceDir, `${evidenceId}-${safeName}`); fs.writeFileSync(storedPath, req.body); const row: Omit<EvidenceWithFile, 'createdAt'> = { id: evidenceId, findingId, assessmentId, type: type as EvidenceWithFile['type'], title, content: `Datei hochgeladen: ${originalName}`, fileName: originalName, filePath: storedPath, contentType: req.headers['content-type'] || 'application/octet-stream' }; const created = await createEvidence(row); res.status(201).json(created) } catch (error: unknown) { res.status(400).json({ message: getErrorMessage(error, 'Evidence-Upload fehlgeschlagen') }) } })
 app.get('/api/retests', requireAuth, async (_req, res) => { try { res.json(await listRetests()) } catch (error: unknown) { res.status(400).json({ message: getErrorMessage(error, 'Retests konnten nicht geladen werden') }) } })
 app.post('/api/retests', requireAuth, async (req, res) => { const parsed = retestSchema.safeParse(req.body); if (!parsed.success) return res.status(400).json({ message: 'Ungültige Retest-Daten' }); try { res.status(201).json(await createRetest(parsed.data)) } catch (error: unknown) { res.status(400).json({ message: getErrorMessage(error, 'Retest konnte nicht gespeichert werden') }) } })
+app.use('/api/evidence/files', requireAuth, express.static(evidenceDir))
 
 startBackupScheduler()
 const clientDist = path.resolve(__dirname, '..', 'dist')
