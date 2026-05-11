@@ -474,6 +474,18 @@ td {
 .app-footer__link {
   margin-left: auto;
   color: var(--accent);
+  text-decoration: none;
+}
+
+.inline-link {
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 0.86rem;
+}
+
+.app-footer__link:hover,
+.inline-link:hover {
+  text-decoration: underline;
 }
 
 .panel--system-summary {
