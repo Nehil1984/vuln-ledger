@@ -88,9 +88,4 @@ Die Datei `unraid-template.xml` ist als Startpunkt für die Einbindung in Unraid
 - `docs/page-map.md` – geplanter Seitenbaum
 - `docs/roadmap.md` – empfohlene Umsetzungsreihenfolge
 
-## Roadmap – empfohlene nächste Schritte
 
-1. Datenmodell für Assessments, Findings und Evidenzen definieren
-2. Navigation und Layout für echte Modulseiten aufbauen
-3. Berichtsausgabe und Exportstruktur planen
-4. Auth, Mehrbenutzerfähigkeit und Rollenmodell ergänzen
