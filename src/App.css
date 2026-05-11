@@ -144,7 +144,6 @@ label span {
   border-color: #2b3b67;
 }
 
-.sidebar__card,
 .panel,
 .stat {
   background: #10182d;
@@ -152,27 +151,52 @@ label span {
   border-radius: 20px;
 }
 
-.sidebar__card {
-  padding: 1rem;
-}
-
-.sidebar__card-title {
-  font-weight: 700;
-  margin-bottom: 0.75rem;
-}
-
-.sidebar__card ul {
-  margin: 0;
-  padding-left: 1.1rem;
+.sidebar__meta {
+  margin-top: auto;
+  padding: 0.85rem 0.25rem 0;
   display: grid;
   gap: 0.35rem;
-  color: #c5d0ee;
+  color: #8ea0d2;
+  font-size: 0.82rem;
+}
+
+.sidebar__logout {
+  margin-top: 0.4rem;
+  padding: 0.7rem 0.9rem;
 }
 
 .main {
   padding: 1.5rem;
   display: grid;
   gap: 1.25rem;
+}
+
+.app-footer {
+  margin-top: auto;
+  padding-top: 0.75rem;
+  color: #7f8db3;
+  font-size: 0.84rem;
+  border-top: 1px solid #1d2740;
+}
+
+.panel--license {
+  padding: 1.35rem;
+}
+
+.license-text {
+  margin: 0;
+  padding: 1rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow: auto;
+  max-height: 60vh;
+  border-radius: 14px;
+  border: 1px solid #202c49;
+  background: #121b31;
+  color: #c5d0ee;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.9rem;
+  line-height: 1.6;
 }
 
 .topbar h1 {
