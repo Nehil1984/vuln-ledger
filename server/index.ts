@@ -123,7 +123,8 @@ app.post('/api/retests', requireAuth, async (req, res) => { const parsed = retes
 app.use('/api/evidence/files', requireAuth, express.static(evidenceDir))
 
 startBackupScheduler()
-const clientDist = path.resolve(__dirname, '..', 'dist')
+const appRoot = path.resolve(__dirname, '..', '..')
+const clientDist = path.join(appRoot, 'dist')
 app.use(express.static(clientDist))
 app.get('/{*any}', (_req, res) => { res.sendFile(path.join(clientDist, 'index.html')) })
 const port = Number(process.env.PORT || 3000)
