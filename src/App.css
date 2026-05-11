@@ -22,6 +22,13 @@ a {
   text-decoration: none;
 }
 
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
 button {
   border: 0;
   border-radius: 12px;
@@ -79,7 +86,11 @@ button.secondary {
 .panel__header span,
 .list__item span,
 .list__item small,
-.todo {
+.todo,
+label span,
+.detail-card small,
+.select-list__item small,
+.select-list__item span {
   color: #9fb3c8;
 }
 
@@ -227,7 +238,7 @@ table {
 }
 
 th,
- td {
+td {
   text-align: left;
   padding: 0.8rem 0.65rem;
   border-bottom: 1px solid rgba(148, 163, 184, 0.1);
@@ -253,30 +264,51 @@ th {
 .badge--medium { background: rgba(234, 179, 8, 0.18); color: #fde68a; }
 .badge--low { background: rgba(34, 197, 94, 0.18); color: #86efac; }
 
-.list {
+.list,
+.select-list,
+.detail-stack {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
 }
 
-.list__item {
+.list__item,
+.select-list__item,
+.detail-card {
   padding: 0.95rem 1rem;
   border-radius: 16px;
   background: rgba(8, 17, 31, 0.5);
   border: 1px solid rgba(148, 163, 184, 0.08);
 }
 
+.select-list__item {
+  text-align: left;
+}
+
+.select-list__item.is-selected {
+  border-color: rgba(34, 211, 238, 0.4);
+  box-shadow: inset 0 0 0 1px rgba(34, 211, 238, 0.16);
+}
+
 .list__item strong,
 .list__item span,
-.list__item small {
+.list__item small,
+.select-list__item strong,
+.select-list__item span,
+.select-list__item small,
+.detail-card strong,
+.detail-card small {
   display: block;
 }
 
-.list__item span {
+.list__item span,
+.select-list__item span {
   margin-top: 0.2rem;
 }
 
-.list__item small {
+.list__item small,
+.select-list__item small,
+.detail-card small {
   margin-top: 0.35rem;
 }
 
@@ -284,6 +316,42 @@ th {
   margin: 0;
   padding-left: 1.2rem;
   line-height: 1.8;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+.form-grid__full {
+  grid-column: 1 / -1;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 12px;
+  background: rgba(8, 17, 31, 0.72);
+  color: #e6eef8;
+  padding: 0.8rem 0.9rem;
+}
+
+textarea {
+  resize: vertical;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 @media (max-width: 1080px) {
@@ -300,7 +368,8 @@ th {
 @media (max-width: 900px) {
   .stats-grid,
   .panel-grid,
-  .panel-grid--wide {
+  .panel-grid--wide,
+  .form-grid {
     grid-template-columns: 1fr;
   }
 
