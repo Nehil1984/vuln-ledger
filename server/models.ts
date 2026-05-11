@@ -60,6 +60,38 @@ export type FindingRecord = {
   createdAt: string
 }
 
+export type ReportStatus = 'Draft' | 'Internes Review' | 'Freigegeben' | 'Exportiert'
+export type ReportRecord = {
+  id: string
+  assessmentId: string
+  title: string
+  status: ReportStatus
+  summary: string
+  createdAt: string
+}
+
+export type EvidenceType = 'Screenshot' | 'Request' | 'Response' | 'Terminal' | 'Datei' | 'Notiz'
+export type EvidenceRecord = {
+  id: string
+  findingId: string
+  assessmentId: string
+  type: EvidenceType
+  title: string
+  content: string
+  createdAt: string
+}
+
+export type RetestResult = 'Offen' | 'Teilweise behoben' | 'Behoben' | 'Nicht reproduzierbar'
+export type RetestRecord = {
+  id: string
+  findingId: string
+  assessmentId: string
+  result: RetestResult
+  tester: string
+  notes: string
+  createdAt: string
+}
+
 export type BackupRetentionConfig = {
   hourly: number
   daily: number
@@ -116,4 +148,7 @@ export type ServerState = {
   customers: CustomerRecord[]
   assessments: AssessmentRecord[]
   findings: FindingRecord[]
+  reports: ReportRecord[]
+  evidence: EvidenceRecord[]
+  retests: RetestRecord[]
 }

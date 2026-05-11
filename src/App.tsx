@@ -6,113 +6,34 @@ type UserRole = 'admin' | 'user'
 type AssessmentStatus = 'Geplant' | 'Aktiv' | 'Review' | 'Abgeschlossen'
 type FindingStatus = 'Offen' | 'Bestätigt' | 'In Bearbeitung' | 'Behoben'
 type Severity = 'Critical' | 'High' | 'Medium' | 'Low'
+type ReportStatus = 'Draft' | 'Internes Review' | 'Freigegeben' | 'Exportiert'
+type EvidenceType = 'Screenshot' | 'Request' | 'Response' | 'Terminal' | 'Datei' | 'Notiz'
+type RetestResult = 'Offen' | 'Teilweise behoben' | 'Behoben' | 'Nicht reproduzierbar'
 type DbBackend = 'lowdb' | 'sqlite'
 
-type SessionUser = {
-  id: string
-  username: string
-  role: UserRole
-}
-
-type LicenseInfo = {
-  status: 'active' | 'inactive' | 'trial'
-  plan: string
-  key: string
-  seats: number
-  customer: string
-  validUntil: string
-  issuedAt: string
-  notes: string
-}
-
-type Customer = {
-  id: string
-  name: string
-  sector: string
-  contactName: string
-  contactEmail: string
-  contactPhone: string
-  notes: string
-  createdAt?: string
-}
-
-type Assessment = {
-  id: string
-  title: string
-  customerId: string
-  type: string
-  mode: string
-  status: AssessmentStatus
-  scope: string
-  leadTester: string
-  rulesOfEngagement: string
-  createdAt?: string
-}
-
-type Finding = {
-  id: string
-  assessmentId: string
-  title: string
-  target: string
-  severity: Severity
-  status: FindingStatus
-  cvssScore: string
-  cwe: string
-  recommendation: string
-  createdAt?: string
-}
-
-type AdminUser = {
-  id: string
-  username: string
-  role: UserRole
-  createdAt: string
-}
-
-type BackupConfig = {
-  backupDir: string
-  retention: { hourly: number; daily: number; weekly: number; monthly: number; yearly: number }
-  encrypt: boolean
-  passwordHint: string
-  enabled: boolean
-  updatedAt: string
-  nextRunAt: string | null
-  lastRunAt: string | null
-  lastSuccessAt: string | null
-  lastErrorAt: string | null
-  lastErrorMessage: string
-  schedulerActive: boolean
-  schedulerRuntimePasswordConfigured: boolean
-}
-
-type BackupRecord = {
-  fileName: string
-  createdAt: string
-  size: number
-  encrypted: boolean
-  slot: string
-  label: string
-  backend: DbBackend | null
-  backendMismatch: boolean
-}
+type SessionUser = { id: string; username: string; role: UserRole }
+type LicenseInfo = { status: 'active' | 'inactive' | 'trial'; plan: string; key: string; seats: number; customer: string; validUntil: string; issuedAt: string; notes: string }
+type Customer = { id: string; name: string; sector: string; contactName: string; contactEmail: string; contactPhone: string; notes: string; createdAt?: string }
+type Assessment = { id: string; title: string; customerId: string; type: string; mode: string; status: AssessmentStatus; scope: string; leadTester: string; rulesOfEngagement: string; createdAt?: string }
+type Finding = { id: string; assessmentId: string; title: string; target: string; severity: Severity; status: FindingStatus; cvssScore: string; cwe: string; recommendation: string; createdAt?: string }
+type Report = { id: string; assessmentId: string; title: string; status: ReportStatus; summary: string; createdAt?: string }
+type Evidence = { id: string; findingId: string; assessmentId: string; type: EvidenceType; title: string; content: string; createdAt?: string }
+type Retest = { id: string; findingId: string; assessmentId: string; result: RetestResult; tester: string; notes: string; createdAt?: string }
+type AdminUser = { id: string; username: string; role: UserRole; createdAt: string }
+type BackupConfig = { backupDir: string; retention: { hourly: number; daily: number; weekly: number; monthly: number; yearly: number }; encrypt: boolean; passwordHint: string; enabled: boolean; updatedAt: string; nextRunAt: string | null; lastRunAt: string | null; lastSuccessAt: string | null; lastErrorAt: string | null; lastErrorMessage: string; schedulerActive: boolean; schedulerRuntimePasswordConfigured: boolean }
+type BackupRecord = { fileName: string; createdAt: string; size: number; encrypted: boolean; slot: string; label: string; backend: DbBackend | null; backendMismatch: boolean }
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard', hint: 'Überblick' },
   { to: '/kunden', label: 'Kunden', hint: 'Mandanten & Kontakte' },
   { to: '/assessments', label: 'Assessments', hint: 'Scopes & Projekte' },
-  { to: '/findings', label: 'Findings', hint: 'Schwachstellen' },
+  { to: '/findings', label: 'Findings', hint: 'Schwachstellen, Evidence, Retests' },
+  { to: '/reports', label: 'Reports', hint: 'Berichte & Review' },
   { to: '/admin', label: 'Admin', hint: 'User, DB, Lizenz, Backup' },
 ]
 
 async function api<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, {
-    ...init,
-    credentials: 'same-origin',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(init?.headers || {}),
-    },
-  })
+  const response = await fetch(url, { ...init, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) } })
   if (!response.ok) {
     let message = `HTTP ${response.status}`
     try {
@@ -127,9 +48,7 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 function getErrorMessage(error: unknown, fallback: string) {
-  if (typeof error === 'object' && error && 'message' in error) {
-    return (error as { message?: string }).message || fallback
-  }
+  if (typeof error === 'object' && error && 'message' in error) return (error as { message?: string }).message || fallback
   return fallback
 }
 
@@ -140,6 +59,9 @@ function App() {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [assessments, setAssessments] = useState<Assessment[]>([])
   const [findings, setFindings] = useState<Finding[]>([])
+  const [reports, setReports] = useState<Report[]>([])
+  const [evidence, setEvidence] = useState<Evidence[]>([])
+  const [retests, setRetests] = useState<Retest[]>([])
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([])
   const [backupConfig, setBackupConfig] = useState<BackupConfig | null>(null)
   const [backups, setBackups] = useState<BackupRecord[]>([])
@@ -147,14 +69,20 @@ function App() {
   const [error, setError] = useState('')
 
   const loadDomainData = async () => {
-    const [customerRows, assessmentRows, findingRows] = await Promise.all([
+    const [customerRows, assessmentRows, findingRows, reportRows, evidenceRows, retestRows] = await Promise.all([
       api<Customer[]>('/api/customers'),
       api<Assessment[]>('/api/assessments'),
       api<Finding[]>('/api/findings'),
+      api<Report[]>('/api/reports'),
+      api<Evidence[]>('/api/evidence'),
+      api<Retest[]>('/api/retests'),
     ])
     setCustomers(customerRows)
     setAssessments(assessmentRows)
     setFindings(findingRows)
+    setReports(reportRows)
+    setEvidence(evidenceRows)
+    setRetests(retestRows)
   }
 
   const loadAdminData = async () => {
@@ -187,32 +115,26 @@ function App() {
     }
   }
 
-  useState(() => {
-    void loadSession()
-    return null
-  })
+  useState(() => { void loadSession(); return null })
 
   const stats = useMemo(() => {
     const activeAssessmentCount = assessments.filter((item) => item.status === 'Aktiv').length
     const criticalFindingCount = findings.filter((item) => item.severity === 'Critical').length
     const highFindingCount = findings.filter((item) => item.severity === 'High').length
-    const openFindings = findings.filter((item) => item.status !== 'Behoben').length
+    const openRetests = retests.filter((item) => item.result === 'Offen' || item.result === 'Teilweise behoben').length
     return [
       { label: 'Aktive Assessments', value: String(activeAssessmentCount), tone: 'neutral' },
       { label: 'Kritische Findings', value: String(criticalFindingCount), tone: 'critical' },
       { label: 'High Findings', value: String(highFindingCount), tone: 'high' },
-      { label: 'Offene Findings', value: String(openFindings), tone: 'medium' },
+      { label: 'Offene Retests', value: String(openRetests), tone: 'medium' },
     ]
-  }, [assessments, findings])
+  }, [assessments, findings, retests])
 
   async function handleLogin(username: string, password: string) {
     setError('')
     setLoading(true)
     try {
-      const session = await api<{ user: SessionUser; backend: DbBackend; license: LicenseInfo }>('/api/auth/login', {
-        method: 'POST',
-        body: JSON.stringify({ username, password }),
-      })
+      const session = await api<{ user: SessionUser; backend: DbBackend; license: LicenseInfo }>('/api/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) })
       setUser(session.user)
       setDbBackend(session.backend)
       setLicense(session.license)
@@ -238,22 +160,18 @@ function App() {
   return (
     <div className="layout">
       <aside className="sidebar">
-        <div className="brand">
-          <img src="/vulnledger-logo.png" alt="VulnLedger" className="brand__logo" />
-          <div><strong>VulnLedger</strong><span>Pentest Documentation</span></div>
-        </div>
-        <nav className="nav">
-          {navItems.filter((item) => item.to !== '/admin' || user.role === 'admin').map((item) => <NavLink key={item.to} to={item.to} className={({ isActive }) => `nav__item ${isActive ? 'is-active' : ''}`}><span>{item.label}</span><small>{item.hint}</small></NavLink>)}
-        </nav>
+        <div className="brand"><img src="/vulnledger-logo.png" alt="VulnLedger" className="brand__logo" /><div><strong>VulnLedger</strong><span>Pentest Documentation</span></div></div>
+        <nav className="nav">{navItems.filter((item) => item.to !== '/admin' || user.role === 'admin').map((item) => <NavLink key={item.to} to={item.to} className={({ isActive }) => `nav__item ${isActive ? 'is-active' : ''}`}><span>{item.label}</span><small>{item.hint}</small></NavLink>)}</nav>
         <div className="sidebar__card"><div className="sidebar__card-title">Session</div><ul><li>{user.username}</li><li>Rolle: {user.role}</li><li>DB: {dbBackend}</li><li>Lizenz: {license?.status ?? '—'}</li></ul><button className="secondary-button top-gap" onClick={() => void handleLogout()}>Logout</button></div>
       </aside>
       <main className="main">
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<DashboardPage customers={customers} assessments={assessments} findings={findings} stats={stats} license={license} />} />
+          <Route path="/dashboard" element={<DashboardPage customers={customers} assessments={assessments} findings={findings} reports={reports} evidence={evidence} retests={retests} stats={stats} license={license} />} />
           <Route path="/kunden" element={<CustomersPage customers={customers} assessments={assessments} onAddCustomer={async (customer) => { const created = await api<Customer>('/api/customers', { method: 'POST', body: JSON.stringify(customer) }); setCustomers((current) => [created, ...current]) }} />} />
           <Route path="/assessments" element={<AssessmentsPage customers={customers} assessments={assessments} onAddAssessment={async (assessment) => { const created = await api<Assessment>('/api/assessments', { method: 'POST', body: JSON.stringify(assessment) }); setAssessments((current) => [created, ...current]) }} onStatusChange={async (assessmentId, status) => { const updated = await api<Assessment>(`/api/assessments/${assessmentId}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }); setAssessments((current) => current.map((item) => item.id === assessmentId ? updated : item)) }} />} />
-          <Route path="/findings" element={<FindingsPage assessments={assessments} findings={findings} onAddFinding={async (finding) => { const created = await api<Finding>('/api/findings', { method: 'POST', body: JSON.stringify(finding) }); setFindings((current) => [created, ...current]) }} onStatusChange={async (findingId, status) => { const updated = await api<Finding>(`/api/findings/${findingId}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }); setFindings((current) => current.map((item) => item.id === findingId ? updated : item)) }} />} />
+          <Route path="/findings" element={<FindingsPage assessments={assessments} findings={findings} evidence={evidence} retests={retests} onAddFinding={async (finding) => { const created = await api<Finding>('/api/findings', { method: 'POST', body: JSON.stringify(finding) }); setFindings((current) => [created, ...current]) }} onStatusChange={async (findingId, status) => { const updated = await api<Finding>(`/api/findings/${findingId}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }); setFindings((current) => current.map((item) => item.id === findingId ? updated : item)) }} onAddEvidence={async (entry) => { const created = await api<Evidence>('/api/evidence', { method: 'POST', body: JSON.stringify(entry) }); setEvidence((current) => [created, ...current]) }} onAddRetest={async (entry) => { const created = await api<Retest>('/api/retests', { method: 'POST', body: JSON.stringify(entry) }); setRetests((current) => [created, ...current]) }} />} />
+          <Route path="/reports" element={<ReportsPage reports={reports} assessments={assessments} findings={findings} onAddReport={async (report) => { const created = await api<Report>('/api/reports', { method: 'POST', body: JSON.stringify(report) }); setReports((current) => [created, ...current]) }} onStatusChange={async (reportId, status) => { const updated = await api<Report>(`/api/reports/${reportId}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }); setReports((current) => current.map((item) => item.id === reportId ? updated : item)) }} />} />
           {user.role === 'admin' ? <Route path="/admin" element={<AdminPage users={adminUsers} dbBackend={dbBackend} backupConfig={backupConfig} backups={backups} license={license} onRefresh={loadAdminData} onUserCreated={(row) => setAdminUsers((current) => [row, ...current])} onDbBackendChanged={setDbBackend} onBackupConfigChanged={setBackupConfig} onBackupsChanged={setBackups} onLicenseChanged={setLicense} />} /> : null}
         </Routes>
       </main>
@@ -272,8 +190,8 @@ function PageHeader({ eyebrow, title, meta }: { eyebrow: string; title: string; 
   return <header className="topbar"><div><span className="eyebrow">{eyebrow}</span><h1>{title}</h1>{meta ? <p className="topbar__meta">{meta}</p> : null}</div></header>
 }
 
-function DashboardPage({ customers, assessments, findings, stats, license }: { customers: Customer[]; assessments: Assessment[]; findings: Finding[]; stats: Array<{ label: string; value: string; tone?: string }>; license: LicenseInfo | null }) {
-  return <><PageHeader eyebrow="Dashboard" title="Operativer Überblick für laufende Assessments" meta={license ? `${license.plan} · gültig bis ${new Date(license.validUntil).toLocaleDateString('de-DE')}` : undefined} /><section className="stats-grid">{stats.map((stat) => <article key={stat.label} className={`stat stat--${stat.tone ?? 'neutral'}`}><span>{stat.label}</span><strong>{stat.value}</strong></article>)}</section><section className="panel-grid panel-grid--wide"><article className="panel"><div className="panel__header"><h2>Priorisierte Findings</h2><span>Top-Risiken</span></div><FindingsTable rows={findings.slice(0, 5)} /></article><article className="panel"><div className="panel__header"><h2>Lizenzstatus</h2><span>{license?.status ?? '—'}</span></div><div className="detail-stack">{license ? <><div className="detail-card"><strong>Kunde</strong><small>{license.customer}</small></div><div className="detail-card"><strong>Key</strong><small>{license.key}</small></div><div className="detail-card"><strong>Seats</strong><small>{license.seats}</small></div><div className="detail-card"><strong>Hinweis</strong><small>{license.notes}</small></div></> : <small>Keine Lizenzdaten geladen.</small>}</div></article></section><section className="panel-grid"><article className="panel"><div className="panel__header"><h2>Kunden im Fokus</h2><span>{customers.length} Kunden</span></div><div className="list">{customers.map((customer) => <div className="list__item" key={customer.id}><strong>{customer.name}</strong><span>{customer.sector}</span><small>{customer.contactEmail}</small></div>)}</div></article><article className="panel"><div className="panel__header"><h2>Assessment-Pipeline</h2><span>{assessments.length} Projekte</span></div><div className="list">{assessments.map((assessment) => <div className="list__item" key={assessment.id}><strong>{assessment.title}</strong><span>{assessment.type} · {assessment.mode}</span><small>{assessment.status}</small></div>)}</div></article></section></>
+function DashboardPage({ customers, assessments, findings, reports, evidence, retests, stats, license }: { customers: Customer[]; assessments: Assessment[]; findings: Finding[]; reports: Report[]; evidence: Evidence[]; retests: Retest[]; stats: Array<{ label: string; value: string; tone?: string }>; license: LicenseInfo | null }) {
+  return <><PageHeader eyebrow="Dashboard" title="Operativer Überblick für laufende Assessments" meta={license ? `${license.plan} · gültig bis ${new Date(license.validUntil).toLocaleDateString('de-DE')}` : undefined} /><section className="stats-grid">{stats.map((stat) => <article key={stat.label} className={`stat stat--${stat.tone ?? 'neutral'}`}><span>{stat.label}</span><strong>{stat.value}</strong></article>)}</section><section className="panel-grid panel-grid--wide"><article className="panel"><div className="panel__header"><h2>Priorisierte Findings</h2><span>Top-Risiken</span></div><FindingsTable rows={findings.slice(0, 5)} /></article><article className="panel"><div className="panel__header"><h2>Workflow-Stand</h2><span>Live</span></div><div className="list"><div className="list__item"><strong>{reports.length} Reports</strong><small>Berichtspfad jetzt serverseitig angebunden</small></div><div className="list__item"><strong>{evidence.length} Evidence-Einträge</strong><small>Nachweise pro Finding persistent</small></div><div className="list__item"><strong>{retests.length} Retests</strong><small>Behebungsstände werden serverseitig mitgeführt</small></div></div></article></section><section className="panel-grid"><article className="panel"><div className="panel__header"><h2>Kunden im Fokus</h2><span>{customers.length} Kunden</span></div><div className="list">{customers.map((customer) => <div className="list__item" key={customer.id}><strong>{customer.name}</strong><span>{customer.sector}</span><small>{customer.contactEmail}</small></div>)}</div></article><article className="panel"><div className="panel__header"><h2>Assessment-Pipeline</h2><span>{assessments.length} Projekte</span></div><div className="list">{assessments.map((assessment) => <div className="list__item" key={assessment.id}><strong>{assessment.title}</strong><span>{assessment.type} · {assessment.mode}</span><small>{assessment.status}</small></div>)}</div></article></section></>
 }
 
 function CustomersPage({ customers, assessments, onAddCustomer }: { customers: Customer[]; assessments: Assessment[]; onAddCustomer: (customer: Customer) => Promise<void> }) {
@@ -292,12 +210,25 @@ function AssessmentsPage({ customers, assessments, onAddAssessment, onStatusChan
   return <><PageHeader eyebrow="Assessments" title="Assessments planen, scopen und steuern" /><section className="panel-grid panel-grid--wide"><article className="panel"><div className="panel__header"><h2>Assessment-Liste</h2><span>{assessments.length} Projekte</span></div><div className="select-list">{assessments.map((assessment) => <button key={assessment.id} className={`select-list__item ${selectedAssessment?.id === assessment.id ? 'is-selected' : ''}`} onClick={() => setSelectedAssessmentId(assessment.id)}><strong>{assessment.title}</strong><span>{customers.find((customer) => customer.id === assessment.customerId)?.name}</span><small>{assessment.type} · {assessment.mode} · {assessment.status}</small></button>)}</div></article><article className="panel"><div className="panel__header"><h2>Assessment-Detail</h2><span>{selectedAssessment?.title ?? '—'}</span></div>{selectedAssessment ? <div className="detail-stack"><div className="detail-card"><strong>Kunde</strong><small>{selectedCustomer?.name}</small></div><div className="detail-card"><strong>Scope</strong><small>{selectedAssessment.scope}</small></div><div className="detail-card"><strong>Rules of Engagement</strong><small>{selectedAssessment.rulesOfEngagement}</small></div><label><span>Status aktualisieren</span><select value={selectedAssessment.status} onChange={(event) => void onStatusChange(selectedAssessment.id, event.target.value as AssessmentStatus)}><option>Geplant</option><option>Aktiv</option><option>Review</option><option>Abgeschlossen</option></select></label></div> : null}</article></section><section className="panel-grid"><article className="panel"><div className="panel__header"><h2>Neues Assessment anlegen</h2><span>API-Workflow</span></div><form className="form-grid" onSubmit={async (event) => { event.preventDefault(); const nextAssessment: Assessment = { id: `a${Date.now()}`, ...form }; await onAddAssessment(nextAssessment); setSelectedAssessmentId(nextAssessment.id); setForm({ title: '', customerId: customers[0]?.id ?? '', type: 'Web', mode: 'Greybox', status: 'Geplant', scope: '', leadTester: 'Daniel Schuh', rulesOfEngagement: '' }) }}><label><span>Titel</span><input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} required /></label><label><span>Kunde</span><select value={form.customerId} onChange={(event) => setForm({ ...form, customerId: event.target.value })}>{customers.map((customer) => <option key={customer.id} value={customer.id}>{customer.name}</option>)}</select></label><label><span>Testart</span><select value={form.type} onChange={(event) => setForm({ ...form, type: event.target.value })}><option>Web</option><option>API</option><option>Infrastruktur</option><option>Mobile</option></select></label><label><span>Ansatz</span><select value={form.mode} onChange={(event) => setForm({ ...form, mode: event.target.value })}><option>Blackbox</option><option>Greybox</option><option>Whitebox</option></select></label><label><span>Lead Tester</span><input value={form.leadTester} onChange={(event) => setForm({ ...form, leadTester: event.target.value })} /></label><label><span>Status</span><select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as AssessmentStatus })}><option>Geplant</option><option>Aktiv</option><option>Review</option><option>Abgeschlossen</option></select></label><label className="form-grid__full"><span>Scope</span><textarea value={form.scope} onChange={(event) => setForm({ ...form, scope: event.target.value })} rows={3} required /></label><label className="form-grid__full"><span>Rules of Engagement</span><textarea value={form.rulesOfEngagement} onChange={(event) => setForm({ ...form, rulesOfEngagement: event.target.value })} rows={4} required /></label><div className="form-grid__full form-actions"><button type="submit">Assessment speichern</button></div></form></article></section></>
 }
 
-function FindingsPage({ assessments, findings, onAddFinding, onStatusChange }: { assessments: Assessment[]; findings: Finding[]; onAddFinding: (finding: Finding) => Promise<void>; onStatusChange: (findingId: string, status: FindingStatus) => Promise<void> }) {
+function FindingsPage({ assessments, findings, evidence, retests, onAddFinding, onStatusChange, onAddEvidence, onAddRetest }: { assessments: Assessment[]; findings: Finding[]; evidence: Evidence[]; retests: Retest[]; onAddFinding: (finding: Finding) => Promise<void>; onStatusChange: (findingId: string, status: FindingStatus) => Promise<void>; onAddEvidence: (entry: Evidence) => Promise<void>; onAddRetest: (entry: Retest) => Promise<void> }) {
   const [selectedFindingId, setSelectedFindingId] = useState(findings[0]?.id ?? '')
   const [form, setForm] = useState({ assessmentId: assessments[0]?.id ?? '', title: '', target: '', severity: 'Medium' as Severity, status: 'Offen' as FindingStatus, cvssScore: '', cwe: '', recommendation: '' })
+  const [evidenceForm, setEvidenceForm] = useState({ type: 'Screenshot' as EvidenceType, title: '', content: '' })
+  const [retestForm, setRetestForm] = useState({ result: 'Offen' as RetestResult, tester: 'Daniel Schuh', notes: '' })
   const selectedFinding = findings.find((finding) => finding.id === selectedFindingId) ?? findings[0]
   const linkedAssessment = assessments.find((assessment) => assessment.id === selectedFinding?.assessmentId)
-  return <><PageHeader eyebrow="Findings" title="Schwachstellen dokumentieren und nachverfolgen" /><section className="panel-grid panel-grid--wide"><article className="panel"><div className="panel__header"><h2>Findings Ledger</h2><span>{findings.length} Einträge</span></div><div className="select-list">{findings.map((finding) => <button key={finding.id} className={`select-list__item ${selectedFinding?.id === finding.id ? 'is-selected' : ''}`} onClick={() => setSelectedFindingId(finding.id)}><strong>{finding.id} · {finding.title}</strong><span>{finding.target}</span><small>{finding.severity} · {finding.status}</small></button>)}</div></article><article className="panel"><div className="panel__header"><h2>Finding-Detail</h2><span>{selectedFinding?.id ?? '—'}</span></div>{selectedFinding ? <div className="detail-stack"><div className="detail-card"><strong>Assessment</strong><small>{linkedAssessment?.title}</small></div><div className="detail-card"><strong>CVSS / CWE</strong><small>{selectedFinding.cvssScore} · {selectedFinding.cwe}</small></div><div className="detail-card"><strong>Empfehlung</strong><small>{selectedFinding.recommendation}</small></div><label><span>Status aktualisieren</span><select value={selectedFinding.status} onChange={(event) => void onStatusChange(selectedFinding.id, event.target.value as FindingStatus)}><option>Offen</option><option>Bestätigt</option><option>In Bearbeitung</option><option>Behoben</option></select></label></div> : null}</article></section><section className="panel-grid"><article className="panel"><div className="panel__header"><h2>Neues Finding anlegen</h2><span>API-Workflow</span></div><form className="form-grid" onSubmit={async (event) => { event.preventDefault(); const nextFinding: Finding = { id: `VL-${new Date().getFullYear()}-${String(findings.length + 1).padStart(4, '0')}`, ...form }; await onAddFinding(nextFinding); setSelectedFindingId(nextFinding.id); setForm({ assessmentId: assessments[0]?.id ?? '', title: '', target: '', severity: 'Medium', status: 'Offen', cvssScore: '', cwe: '', recommendation: '' }) }}><label><span>Assessment</span><select value={form.assessmentId} onChange={(event) => setForm({ ...form, assessmentId: event.target.value })}>{assessments.map((assessment) => <option key={assessment.id} value={assessment.id}>{assessment.title}</option>)}</select></label><label><span>Titel</span><input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} required /></label><label><span>Target</span><input value={form.target} onChange={(event) => setForm({ ...form, target: event.target.value })} required /></label><label><span>Severity</span><select value={form.severity} onChange={(event) => setForm({ ...form, severity: event.target.value as Severity })}><option>Critical</option><option>High</option><option>Medium</option><option>Low</option></select></label><label><span>CVSS</span><input value={form.cvssScore} onChange={(event) => setForm({ ...form, cvssScore: event.target.value })} placeholder="z. B. 8.1" /></label><label><span>CWE</span><input value={form.cwe} onChange={(event) => setForm({ ...form, cwe: event.target.value })} placeholder="z. B. CWE-79" /></label><label className="form-grid__full"><span>Empfehlung</span><textarea value={form.recommendation} onChange={(event) => setForm({ ...form, recommendation: event.target.value })} rows={4} required /></label><div className="form-grid__full form-actions"><button type="submit">Finding speichern</button></div></form></article></section></>
+  const findingEvidence = evidence.filter((entry) => entry.findingId === selectedFinding?.id)
+  const findingRetests = retests.filter((entry) => entry.findingId === selectedFinding?.id)
+  return <><PageHeader eyebrow="Findings" title="Schwachstellen dokumentieren und nachverfolgen" /><section className="panel-grid panel-grid--wide"><article className="panel"><div className="panel__header"><h2>Findings Ledger</h2><span>{findings.length} Einträge</span></div><div className="select-list">{findings.map((finding) => <button key={finding.id} className={`select-list__item ${selectedFinding?.id === finding.id ? 'is-selected' : ''}`} onClick={() => setSelectedFindingId(finding.id)}><strong>{finding.id} · {finding.title}</strong><span>{finding.target}</span><small>{finding.severity} · {finding.status}</small></button>)}</div></article><article className="panel"><div className="panel__header"><h2>Finding-Detail</h2><span>{selectedFinding?.id ?? '—'}</span></div>{selectedFinding ? <div className="detail-stack"><div className="detail-card"><strong>Assessment</strong><small>{linkedAssessment?.title}</small></div><div className="detail-card"><strong>CVSS / CWE</strong><small>{selectedFinding.cvssScore} · {selectedFinding.cwe}</small></div><div className="detail-card"><strong>Empfehlung</strong><small>{selectedFinding.recommendation}</small></div><label><span>Status aktualisieren</span><select value={selectedFinding.status} onChange={(event) => void onStatusChange(selectedFinding.id, event.target.value as FindingStatus)}><option>Offen</option><option>Bestätigt</option><option>In Bearbeitung</option><option>Behoben</option></select></label></div> : null}</article></section><section className="panel-grid"><article className="panel"><div className="panel__header"><h2>Neues Finding anlegen</h2><span>API-Workflow</span></div><form className="form-grid" onSubmit={async (event) => { event.preventDefault(); const nextFinding: Finding = { id: `VL-${new Date().getFullYear()}-${String(findings.length + 1).padStart(4, '0')}`, ...form }; await onAddFinding(nextFinding); setSelectedFindingId(nextFinding.id); setForm({ assessmentId: assessments[0]?.id ?? '', title: '', target: '', severity: 'Medium', status: 'Offen', cvssScore: '', cwe: '', recommendation: '' }) }}><label><span>Assessment</span><select value={form.assessmentId} onChange={(event) => setForm({ ...form, assessmentId: event.target.value })}>{assessments.map((assessment) => <option key={assessment.id} value={assessment.id}>{assessment.title}</option>)}</select></label><label><span>Titel</span><input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} required /></label><label><span>Target</span><input value={form.target} onChange={(event) => setForm({ ...form, target: event.target.value })} required /></label><label><span>Severity</span><select value={form.severity} onChange={(event) => setForm({ ...form, severity: event.target.value as Severity })}><option>Critical</option><option>High</option><option>Medium</option><option>Low</option></select></label><label><span>CVSS</span><input value={form.cvssScore} onChange={(event) => setForm({ ...form, cvssScore: event.target.value })} placeholder="z. B. 8.1" /></label><label><span>CWE</span><input value={form.cwe} onChange={(event) => setForm({ ...form, cwe: event.target.value })} placeholder="z. B. CWE-79" /></label><label className="form-grid__full"><span>Empfehlung</span><textarea value={form.recommendation} onChange={(event) => setForm({ ...form, recommendation: event.target.value })} rows={4} required /></label><div className="form-grid__full form-actions"><button type="submit">Finding speichern</button></div></form></article></section><section className="panel-grid panel-grid--wide"><article className="panel"><div className="panel__header"><h2>Evidence-Workflow</h2><span>{findingEvidence.length} Einträge</span></div><div className="list">{findingEvidence.length ? findingEvidence.map((entry) => <div className="list__item" key={entry.id}><strong>{entry.title}</strong><span>{entry.type}</span><small>{entry.content}</small></div>) : <div className="list__item"><small>Für dieses Finding existiert noch keine Evidence.</small></div>}</div><form className="form-grid top-gap" onSubmit={async (event) => { event.preventDefault(); if (!selectedFinding) return; await onAddEvidence({ id: `e${Date.now()}`, assessmentId: selectedFinding.assessmentId, findingId: selectedFinding.id, ...evidenceForm }); setEvidenceForm({ type: 'Screenshot', title: '', content: '' }) }}><label><span>Typ</span><select value={evidenceForm.type} onChange={(event) => setEvidenceForm({ ...evidenceForm, type: event.target.value as EvidenceType })}><option>Screenshot</option><option>Request</option><option>Response</option><option>Terminal</option><option>Datei</option><option>Notiz</option></select></label><label><span>Titel</span><input value={evidenceForm.title} onChange={(event) => setEvidenceForm({ ...evidenceForm, title: event.target.value })} required /></label><label className="form-grid__full"><span>Inhalt / Nachweis</span><textarea value={evidenceForm.content} onChange={(event) => setEvidenceForm({ ...evidenceForm, content: event.target.value })} rows={4} required /></label><div className="form-grid__full form-actions"><button type="submit">Evidence speichern</button></div></form></article><article className="panel"><div className="panel__header"><h2>Retest-Workflow</h2><span>{findingRetests.length} Einträge</span></div><div className="list">{findingRetests.length ? findingRetests.map((entry) => <div className="list__item" key={entry.id}><strong>{entry.result}</strong><span>{entry.tester}</span><small>{entry.notes}</small></div>) : <div className="list__item"><small>Für dieses Finding gibt es noch keinen Retest.</small></div>}</div><form className="form-grid top-gap" onSubmit={async (event) => { event.preventDefault(); if (!selectedFinding) return; await onAddRetest({ id: `rt${Date.now()}`, assessmentId: selectedFinding.assessmentId, findingId: selectedFinding.id, ...retestForm }); setRetestForm({ result: 'Offen', tester: 'Daniel Schuh', notes: '' }) }}><label><span>Ergebnis</span><select value={retestForm.result} onChange={(event) => setRetestForm({ ...retestForm, result: event.target.value as RetestResult })}><option>Offen</option><option>Teilweise behoben</option><option>Behoben</option><option>Nicht reproduzierbar</option></select></label><label><span>Tester</span><input value={retestForm.tester} onChange={(event) => setRetestForm({ ...retestForm, tester: event.target.value })} /></label><label className="form-grid__full"><span>Retest-Notiz</span><textarea value={retestForm.notes} onChange={(event) => setRetestForm({ ...retestForm, notes: event.target.value })} rows={4} required /></label><div className="form-grid__full form-actions"><button type="submit">Retest speichern</button></div></form></article></section></>
+}
+
+function ReportsPage({ reports, assessments, findings, onAddReport, onStatusChange }: { reports: Report[]; assessments: Assessment[]; findings: Finding[]; onAddReport: (report: Report) => Promise<void>; onStatusChange: (reportId: string, status: ReportStatus) => Promise<void> }) {
+  const [selectedReportId, setSelectedReportId] = useState(reports[0]?.id ?? '')
+  const [form, setForm] = useState({ assessmentId: assessments[0]?.id ?? '', title: '', status: 'Draft' as ReportStatus, summary: '' })
+  const selectedReport = reports.find((report) => report.id === selectedReportId) ?? reports[0]
+  const linkedAssessment = assessments.find((assessment) => assessment.id === selectedReport?.assessmentId)
+  const reportFindings = findings.filter((finding) => finding.assessmentId === selectedReport?.assessmentId)
+  return <><PageHeader eyebrow="Reports" title="Berichte vorbereiten und Freigabestatus steuern" /><section className="panel-grid panel-grid--wide"><article className="panel"><div className="panel__header"><h2>Report-Liste</h2><span>{reports.length} Reports</span></div><div className="select-list">{reports.map((report) => <button key={report.id} className={`select-list__item ${selectedReport?.id === report.id ? 'is-selected' : ''}`} onClick={() => setSelectedReportId(report.id)}><strong>{report.title}</strong><span>{report.status}</span><small>{report.summary}</small></button>)}</div></article><article className="panel"><div className="panel__header"><h2>Report-Detail</h2><span>{selectedReport?.title ?? '—'}</span></div>{selectedReport ? <div className="detail-stack"><div className="detail-card"><strong>Assessment</strong><small>{linkedAssessment?.title}</small></div><div className="detail-card"><strong>Summary</strong><small>{selectedReport.summary}</small></div><div className="detail-card"><strong>Findings im Report-Kontext</strong>{reportFindings.length ? reportFindings.map((finding) => <small key={finding.id}>{finding.id} · {finding.title} · {finding.severity}</small>) : <small>Aktuell keine Findings verknüpft.</small>}</div><label><span>Status aktualisieren</span><select value={selectedReport.status} onChange={(event) => void onStatusChange(selectedReport.id, event.target.value as ReportStatus)}><option>Draft</option><option>Internes Review</option><option>Freigegeben</option><option>Exportiert</option></select></label></div> : null}</article></section><section className="panel-grid"><article className="panel"><div className="panel__header"><h2>Neuen Report anlegen</h2><span>API-Workflow</span></div><form className="form-grid" onSubmit={async (event) => { event.preventDefault(); const nextReport: Report = { id: `r${Date.now()}`, ...form }; await onAddReport(nextReport); setSelectedReportId(nextReport.id); setForm({ assessmentId: assessments[0]?.id ?? '', title: '', status: 'Draft', summary: '' }) }}><label><span>Assessment</span><select value={form.assessmentId} onChange={(event) => setForm({ ...form, assessmentId: event.target.value })}>{assessments.map((assessment) => <option key={assessment.id} value={assessment.id}>{assessment.title}</option>)}</select></label><label><span>Titel</span><input value={form.title} onChange={(event) => setForm({ ...form, title: event.target.value })} required /></label><label><span>Status</span><select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as ReportStatus })}><option>Draft</option><option>Internes Review</option><option>Freigegeben</option><option>Exportiert</option></select></label><label className="form-grid__full"><span>Executive Summary / Kurzbeschreibung</span><textarea value={form.summary} onChange={(event) => setForm({ ...form, summary: event.target.value })} rows={4} required /></label><div className="form-grid__full form-actions"><button type="submit">Report speichern</button></div></form></article></section></>
 }
 
 function AdminPage({ users, dbBackend, backupConfig, backups, license, onRefresh, onUserCreated, onDbBackendChanged, onBackupConfigChanged, onBackupsChanged, onLicenseChanged }: { users: AdminUser[]; dbBackend: DbBackend; backupConfig: BackupConfig | null; backups: BackupRecord[]; license: LicenseInfo | null; onRefresh: () => Promise<void>; onUserCreated: (row: AdminUser) => void; onDbBackendChanged: (backend: DbBackend) => void; onBackupConfigChanged: (cfg: BackupConfig | null) => void; onBackupsChanged: (rows: BackupRecord[]) => void; onLicenseChanged: (row: LicenseInfo | null) => void }) {

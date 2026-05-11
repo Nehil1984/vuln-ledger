@@ -5,8 +5,11 @@ import type {
   AssessmentRecord,
   CustomerRecord,
   DbBackend,
+  EvidenceRecord,
   FindingRecord,
   LicenseRecord,
+  ReportRecord,
+  RetestRecord,
   UserRecord,
   UserRole,
 } from './models.js'
@@ -37,13 +40,7 @@ export async function createUser(username: string, password: string, role: UserR
   if (readDbBackend() === 'sqlite') return createUserSqlite(username, password, role)
   const db = await getDataDb()
   const passwordHash = await bcrypt.hash(password, 10)
-  const user: UserRecord = {
-    id: `u-${Date.now()}`,
-    username,
-    passwordHash,
-    role,
-    createdAt: new Date().toISOString(),
-  }
+  const user: UserRecord = { id: `u-${Date.now()}`, username, passwordHash, role, createdAt: new Date().toISOString() }
   db.data.users.push(user)
   await db.write()
   return user
@@ -123,6 +120,58 @@ export async function updateFindingStatus(id: string, status: FindingRecord['sta
   const row = db.data.findings.find((item) => item.id === id)
   if (!row) return null
   row.status = status
+  await db.write()
+  return row
+}
+
+export async function listReports(): Promise<ReportRecord[]> {
+  if (readDbBackend() === 'sqlite') ensureSqliteUnsupported()
+  return (await getDataDb()).data.reports
+}
+
+export async function createReport(input: Omit<ReportRecord, 'createdAt'>): Promise<ReportRecord> {
+  if (readDbBackend() === 'sqlite') ensureSqliteUnsupported()
+  const db = await getDataDb()
+  const row: ReportRecord = { ...input, createdAt: new Date().toISOString() }
+  db.data.reports.unshift(row)
+  await db.write()
+  return row
+}
+
+export async function updateReportStatus(id: string, status: ReportRecord['status']) {
+  if (readDbBackend() === 'sqlite') ensureSqliteUnsupported()
+  const db = await getDataDb()
+  const row = db.data.reports.find((item) => item.id === id)
+  if (!row) return null
+  row.status = status
+  await db.write()
+  return row
+}
+
+export async function listEvidence(): Promise<EvidenceRecord[]> {
+  if (readDbBackend() === 'sqlite') ensureSqliteUnsupported()
+  return (await getDataDb()).data.evidence
+}
+
+export async function createEvidence(input: Omit<EvidenceRecord, 'createdAt'>): Promise<EvidenceRecord> {
+  if (readDbBackend() === 'sqlite') ensureSqliteUnsupported()
+  const db = await getDataDb()
+  const row: EvidenceRecord = { ...input, createdAt: new Date().toISOString() }
+  db.data.evidence.unshift(row)
+  await db.write()
+  return row
+}
+
+export async function listRetests(): Promise<RetestRecord[]> {
+  if (readDbBackend() === 'sqlite') ensureSqliteUnsupported()
+  return (await getDataDb()).data.retests
+}
+
+export async function createRetest(input: Omit<RetestRecord, 'createdAt'>): Promise<RetestRecord> {
+  if (readDbBackend() === 'sqlite') ensureSqliteUnsupported()
+  const db = await getDataDb()
+  const row: RetestRecord = { ...input, createdAt: new Date().toISOString() }
+  db.data.retests.unshift(row)
   await db.write()
   return row
 }
