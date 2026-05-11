@@ -36,6 +36,13 @@ jobs:
           tags: |
             type=raw,value=latest
             type=sha
+          labels: |
+            org.opencontainers.image.title=vuln-ledger
+            org.opencontainers.image.description=Self-hostable penetration testing documentation and reporting platform.
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.url=https://github.com/${{ github.repository }}
+            org.opencontainers.image.vendor=Daniel Schuh
+            org.opencontainers.image.licenses=Apache-2.0
 
       - name: Build and push
         uses: docker/build-push-action@v6
