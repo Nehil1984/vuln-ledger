@@ -4,6 +4,7 @@
 
 import express from 'express'
 import session from 'express-session'
+import createMemoryStore from 'memorystore'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -16,10 +17,17 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const app = express()
 const evidenceDir = path.resolve(process.cwd(), 'data', 'evidence')
+const MemoryStore = createMemoryStore(session)
 fs.mkdirSync(evidenceDir, { recursive: true })
 
 app.use(express.json({ limit: '10mb' }))
-app.use(session({ secret: process.env.SESSION_SECRET || 'vulnledger-dev-session-secret-change-me', resave: false, saveUninitialized: false, cookie: { httpOnly: true, sameSite: 'lax', secure: false, maxAge: 8 * 60 * 60 * 1000 } }))
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'vulnledger-dev-session-secret-change-me',
+  resave: false,
+  saveUninitialized: false,
+  store: new MemoryStore({ checkPeriod: 24 * 60 * 60 * 1000 }),
+  cookie: { httpOnly: true, sameSite: 'lax', secure: false, maxAge: 8 * 60 * 60 * 1000 },
+}))
 
 type SessionUser = { id: string; username: string; role: UserRole; tenantIds: string[] }
 declare module 'express-session' { interface SessionData { user?: SessionUser } }
