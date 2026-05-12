@@ -87,7 +87,19 @@ function requireAuth(req: express.Request, res: express.Response, next: express.
 }
 async function currentUser(req: express.Request): Promise<UserRecord | null> {
   const authUser = (req as express.Request & { authUser?: SessionUser }).authUser
-  return (await listUsers()).find((user) => user.id === authUser?.id) ?? null
+  if (!authUser) return null
+
+  const storedUser = (await listUsers()).find((user) => user.id === authUser.id)
+  if (storedUser) return storedUser
+
+  return {
+    id: authUser.id,
+    username: authUser.username,
+    passwordHash: '',
+    role: authUser.role,
+    tenantIds: Array.isArray(authUser.tenantIds) ? authUser.tenantIds : [],
+    createdAt: new Date(0).toISOString(),
+  }
 }
 function requireAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
   const authUser = (req as express.Request & { authUser?: SessionUser }).authUser
