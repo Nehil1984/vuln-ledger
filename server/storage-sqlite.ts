@@ -110,7 +110,6 @@ function getDb() {
     );
   `)
   ensureDefaultAdmin(db)
-  ensureSeedData(db)
   return db
 }
 
@@ -121,30 +120,12 @@ function ensureDefaultAdmin(database: Database.Database) {
   const existing = database.prepare('SELECT id FROM users LIMIT 1').get() as { id: string } | undefined
   if (existing) return
   const username = process.env.ADMIN_USERNAME || 'admin'
-  const password = process.env.ADMIN_PASSWORD || 'admin123!'
+  const password = process.env.ADMIN_PASSWORD || 'change-me-now'
   const passwordHash = bcrypt.hashSync(password, 10)
   database.prepare('INSERT INTO users (id, username, password_hash, role, tenant_ids, created_at) VALUES (?, ?, ?, ?, ?, ?)').run('u-admin', username, passwordHash, 'admin', stringifyList(['c1', 'c2']), now())
   database.prepare('INSERT INTO users (id, username, password_hash, role, tenant_ids, created_at) VALUES (?, ?, ?, ?, ?, ?)').run('u-manager', 'verwalter', bcrypt.hashSync('verwalter123!', 10), 'verwalter', stringifyList(['c1', 'c2']), now())
   database.prepare('INSERT INTO users (id, username, password_hash, role, tenant_ids, created_at) VALUES (?, ?, ?, ?, ?, ?)').run('u-tech', 'techniker', bcrypt.hashSync('techniker123!', 10), 'techniker', stringifyList(['c1']), now())
   database.prepare('INSERT INTO users (id, username, password_hash, role, tenant_ids, created_at) VALUES (?, ?, ?, ?, ?, ?)').run('u-user', 'user', bcrypt.hashSync('user12345!', 10), 'user', stringifyList(['c2']), now())
-}
-
-function ensureSeedData(database: Database.Database) {
-  const groupCount = database.prepare('SELECT COUNT(*) AS count FROM groups_vl').get() as { count: number }
-  if (groupCount.count > 0) return
-  const ts = now()
-  database.prepare('INSERT INTO groups_vl (id, name, description, tenant_ids, created_at) VALUES (?, ?, ?, ?, ?)').run('g1', 'Muster Holding', 'Beispielhafter Konzernverbund mit mehreren Mandanten.', stringifyList(['c1', 'c2']), ts)
-  database.prepare('INSERT INTO customers (id, group_id, name, sector, contact_name, contact_email, contact_phone, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run('c1', 'g1', 'Musterwerk GmbH', 'Industrie', 'Laura Stein', 'it@musterwerk.de', '+49 211 555100', 'Produktionsnahe Webplattform mit erhöhtem Verfügbarkeitsbedarf.', ts)
-  database.prepare('INSERT INTO customers (id, group_id, name, sector, contact_name, contact_email, contact_phone, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run('c2', 'g1', 'Blue Harbor AG', 'SaaS', 'Jonas Weber', 'security@blueharbor.io', '+49 30 884422', 'API-first Produkt, Fokus auf AuthN/AuthZ und Mandantentrennung.', ts)
-  database.prepare('INSERT INTO assessments (id, customer_id, title, type, mode, status, scope, lead_tester, rules_of_engagement, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run('a1', 'c1', 'External Web Pentest Q2', 'Web', 'Greybox', 'Aktiv', 'portal.example.tld, admin.example.tld', 'Daniel Schuh', 'Keine Lasttests, produktionsnahe Ausnutzung nur nach Rücksprache.', ts)
-  database.prepare('INSERT INTO assessments (id, customer_id, title, type, mode, status, scope, lead_tester, rules_of_engagement, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run('a2', 'c2', 'API Security Review', 'API', 'Whitebox', 'Review', 'api.blueharbor.io/v1 + Auth-Service', 'Daniel Schuh', 'Nur bereitgestellte Testzugänge verwenden.', ts)
-  database.prepare('INSERT INTO findings (id, customer_id, assessment_id, title, target, severity, status, cvss_score, cwe, recommendation, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run('VL-2026-0001', 'c1', 'a1', 'Authenticated RCE via file import', 'portal.example.tld', 'Critical', 'Bestätigt', '9.8', 'CWE-94', 'Serverseitige Validierung härten und Importpfad isolieren.', ts)
-  database.prepare('INSERT INTO findings (id, customer_id, assessment_id, title, target, severity, status, cvss_score, cwe, recommendation, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run('VL-2026-0002', 'c1', 'a1', 'Stored XSS in admin comment field', 'admin.example.tld', 'High', 'Offen', '8.1', 'CWE-79', 'Kontextbezogenes Encoding und serverseitige Filterung ergänzen.', ts)
-  database.prepare('INSERT INTO findings (id, customer_id, assessment_id, title, target, severity, status, cvss_score, cwe, recommendation, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run('VL-2026-0003', 'c2', 'a2', 'Weak password policy on VPN portal', 'vpn.example.tld', 'Medium', 'In Bearbeitung', '5.9', 'CWE-521', 'MFA erzwingen und Passwortvorgaben verschärfen.', ts)
-  database.prepare('INSERT INTO reports (id, scope_type, customer_id, group_id, assessment_id, title, status, summary, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run('r1', 'tenant', 'c1', null, 'a1', 'External Web Pentest Q2 Report', 'Draft', 'Fokus auf Angriffsoberfläche, Authentisierung, Dateiupload und Rollenmodelle.', ts)
-  database.prepare('INSERT INTO reports (id, scope_type, customer_id, group_id, assessment_id, title, status, summary, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run('r2', 'group', null, 'g1', null, 'Konzernreport Muster Holding', 'Internes Review', 'Konsolidierter Überblick über Findings und Maßnahmen über mehrere Mandanten.', ts)
-  database.prepare('INSERT INTO evidence (id, customer_id, finding_id, assessment_id, type, title, content, file_name, file_path, content_type, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run('e1', 'c1', 'VL-2026-0001', 'a1', 'Screenshot', 'Upload dialog before payload execution', 'Screenshot dokumentiert den Importdialog und den anschließenden Erfolgspfad.', null, null, null, ts)
-  database.prepare('INSERT INTO retests (id, customer_id, finding_id, assessment_id, result, tester, notes, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)').run('rt1', 'c2', 'VL-2026-0003', 'a2', 'Teilweise behoben', 'Daniel Schuh', 'MFA wurde ergänzt, Passwort-Policy jedoch noch nicht vollständig verschärft.', ts)
 }
 
 export async function listUsersSqlite(): Promise<UserRecord[]> {

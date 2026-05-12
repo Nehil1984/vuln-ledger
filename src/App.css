@@ -236,6 +236,9 @@ label span { color: var(--text-soft); font-size: 0.88rem; font-weight: 500; }
 }
 .select-list__item.is-selected { border-color: var(--accent); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); }
 .list__item span, .detail-card small, .select-list__item span, .select-list__item small { color: var(--text-soft); }
+.empty-state { display: grid; gap: 0.75rem; }
+.empty-state h2 { margin: 0; }
+.empty-state p { margin: 0; color: var(--text-soft); }
 .form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .form-grid__full { grid-column: 1 / -1; }
 .form-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; }
