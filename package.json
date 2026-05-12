@@ -1,7 +1,7 @@
 {
   "name": "vuln-ledger",
   "private": true,
-  "version": "0.3.8",
+  "version": "0.3.9",
   "license": "Apache-2.0",
   "type": "module",
   "scripts": {
@@ -14,12 +14,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@types/jsonwebtoken": "^9.0.10",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.9.0",
     "express": "^5.2.1",
     "express-session": "^1.19.0",
-    "memorystore": "^1.6.7",
+    "jsonwebtoken": "^9.0.3",
     "lowdb": "^7.0.1",
+    "memorystore": "^1.6.7",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "react-router-dom": "^7.15.0",

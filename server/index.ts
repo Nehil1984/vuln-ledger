@@ -3,11 +3,10 @@
 // http://www.apache.org/licenses/LICENSE-2.0
 
 import express from 'express'
-import session from 'express-session'
-import createMemoryStore from 'memorystore'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import jwt from 'jsonwebtoken'
 import { z } from 'zod'
 import { inspectBackup, inspectUploadedBackup, listBackups, readBackupConfig, readBackupStatus, restoreBackup, restoreUploadedBackup, runBackupNow, startBackupScheduler, writeBackupConfig } from './backup.js'
 import { canGenerateReports, canReadTenant, canWriteTenant, createAssessment, createCustomer, createEvidence, createFinding, createGroup, createReport, createRetest, createUser, getDbBackend, listAssessments, listCustomers, listEvidence, listFindings, listGroups, listReports, listRetests, listUsers, migrateDbBackend, updateAssessmentStatus, updateCustomer, updateFindingStatus, updateGroup, updateReportStatus, verifyUser, type EvidenceWithFile, type GroupInput } from './storage.js'
@@ -17,20 +16,12 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const app = express()
 const evidenceDir = path.resolve(process.cwd(), 'data', 'evidence')
-const MemoryStore = createMemoryStore(session)
+const JWT_SECRET = process.env.JWT_SECRET || process.env.SESSION_SECRET || 'vulnledger-dev-session-secret-change-me'
 fs.mkdirSync(evidenceDir, { recursive: true })
 
 app.use(express.json({ limit: '10mb' }))
-app.use(session({
-  secret: process.env.SESSION_SECRET || 'vulnledger-dev-session-secret-change-me',
-  resave: false,
-  saveUninitialized: false,
-  store: new MemoryStore({ checkPeriod: 24 * 60 * 60 * 1000 }),
-  cookie: { httpOnly: true, sameSite: 'lax', secure: false, maxAge: 8 * 60 * 60 * 1000 },
-}))
 
 type SessionUser = { id: string; username: string; role: UserRole; tenantIds: string[] }
-declare module 'express-session' { interface SessionData { user?: SessionUser } }
 
 type ErrorWithMessage = { message?: string }
 const msg = (error: unknown, fallback: string) => typeof error === 'object' && error && 'message' in error ? ((error as ErrorWithMessage).message || fallback) : fallback
@@ -51,10 +42,63 @@ const reportStatusSchema = z.object({ status: z.enum(['Draft', 'Internes Review'
 const backupConfigSchema = z.object({ enabled: z.boolean().optional(), encrypt: z.boolean().optional(), passwordHint: z.string().optional(), retention: z.object({ hourly: z.number().int().min(1).max(168).optional(), daily: z.number().int().min(1).max(366).optional(), weekly: z.number().int().min(1).max(104).optional(), monthly: z.number().int().min(1).max(120).optional(), yearly: z.number().int().min(1).max(20).optional() }).optional() })
 const backupRestoreSchema = z.object({ fileName: z.string().min(1), password: z.string().optional(), dryRun: z.boolean().optional() })
 
-function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) { if (!req.session.user) return res.status(401).json({ message: 'Nicht authentifiziert' }); next() }
-async function currentUser(req: express.Request): Promise<UserRecord | null> { return (await listUsers()).find((user) => user.id === req.session.user?.id) ?? null }
-function requireAdmin(req: express.Request, res: express.Response, next: express.NextFunction) { if (!req.session.user || req.session.user.role !== 'admin') return res.status(403).json({ message: 'Nur für Admins' }); next() }
-function requireManagerOrAdmin(req: express.Request, res: express.Response, next: express.NextFunction) { if (!req.session.user || !['admin', 'verwalter'].includes(req.session.user.role)) return res.status(403).json({ message: 'Nur für Admin oder Verwalter' }); next(); }
+function readNamedCookie(req: express.Request, name: string): string | null {
+  const cookieHeader = req.headers.cookie
+  if (!cookieHeader) return null
+
+  for (const part of cookieHeader.split(';')) {
+    const trimmed = part.trim()
+    if (!trimmed.startsWith(`${name}=`)) continue
+    const rawValue = trimmed.slice(name.length + 1)
+    if (!rawValue) return null
+    try {
+      return decodeURIComponent(rawValue)
+    } catch {
+      return rawValue
+    }
+  }
+
+  return null
+}
+
+function setAuthCookie(res: express.Response, token: string) {
+  res.setHeader('Set-Cookie', [`vulnledger_auth=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${8 * 60 * 60}`])
+}
+
+function clearAuthCookie(res: express.Response) {
+  res.setHeader('Set-Cookie', ['vulnledger_auth=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0'])
+}
+
+function getAuthUser(req: express.Request): SessionUser | null {
+  const token = readNamedCookie(req, 'vulnledger_auth')
+  if (!token) return null
+  try {
+    return jwt.verify(token, JWT_SECRET) as SessionUser
+  } catch {
+    return null
+  }
+}
+
+function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const user = getAuthUser(req)
+  if (!user) return res.status(401).json({ message: 'Nicht authentifiziert' })
+  ;(req as express.Request & { authUser?: SessionUser }).authUser = user
+  next()
+}
+async function currentUser(req: express.Request): Promise<UserRecord | null> {
+  const authUser = (req as express.Request & { authUser?: SessionUser }).authUser
+  return (await listUsers()).find((user) => user.id === authUser?.id) ?? null
+}
+function requireAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const authUser = (req as express.Request & { authUser?: SessionUser }).authUser
+  if (!authUser || authUser.role !== 'admin') return res.status(403).json({ message: 'Nur für Admins' })
+  next()
+}
+function requireManagerOrAdmin(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const authUser = (req as express.Request & { authUser?: SessionUser }).authUser
+  if (!authUser || !['admin', 'verwalter'].includes(authUser.role)) return res.status(403).json({ message: 'Nur für Admin oder Verwalter' })
+  next()
+}
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, backend: getDbBackend() }))
 app.post('/api/auth/login', async (req, res) => {
@@ -64,17 +108,16 @@ app.post('/api/auth/login', async (req, res) => {
   const user = await verifyUser(parsed.data.username, parsed.data.password)
   if (!user) return res.status(401).json({ message: 'Benutzername oder Passwort falsch' })
 
-  req.session.user = { id: user.id, username: user.username, role: user.role, tenantIds: user.tenantIds }
-  req.session.save((error) => {
-    if (error) {
-      console.error('session save failed after login', error)
-      return res.status(500).json({ message: 'Session konnte nicht gespeichert werden' })
-    }
-    res.json({ user: req.session.user, backend: getDbBackend() })
-  })
+  const authUser: SessionUser = { id: user.id, username: user.username, role: user.role, tenantIds: user.tenantIds }
+  const token = jwt.sign(authUser, JWT_SECRET, { expiresIn: '8h' })
+  setAuthCookie(res, token)
+  res.json({ user: authUser, backend: getDbBackend() })
 })
-app.post('/api/auth/logout', (req, res) => { req.session.destroy(() => res.json({ ok: true })) })
-app.get('/api/auth/me', requireAuth, (req, res) => res.json({ user: req.session.user, backend: getDbBackend() }))
+app.post('/api/auth/logout', (_req, res) => { clearAuthCookie(res); res.json({ ok: true }) })
+app.get('/api/auth/me', requireAuth, (req, res) => {
+  const authUser = (req as express.Request & { authUser?: SessionUser }).authUser
+  res.json({ user: authUser, backend: getDbBackend() })
+})
 
 app.get('/api/admin/users', requireAuth, requireAdmin, async (_req, res) => { const users = await listUsers(); res.json(users.map((user) => ({ id: user.id, username: user.username, role: user.role, tenantIds: user.tenantIds, createdAt: user.createdAt }))) })
 app.post('/api/admin/users', requireAuth, requireAdmin, async (req, res) => { const parsed = createUserSchema.safeParse(req.body); if (!parsed.success) return res.status(400).json({ message: 'Ungültige Benutzerdaten' }); const user = await createUser(parsed.data); res.status(201).json({ id: user.id, username: user.username, role: user.role, tenantIds: user.tenantIds, createdAt: user.createdAt }) })
