@@ -1,0 +1,103 @@
+<!-- Copyright 2026 Daniel Schuh | Licensed under Apache License 2.0 | http://www.apache.org/licenses/LICENSE-2.0 -->
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VulnLedger – Reportexport</title>
+  <style>
+    body { font-family: Inter, system-ui, sans-serif; margin: 0; background: #f3f6fb; color: #162033; }
+    .shell { max-width: 1120px; margin: 0 auto; padding: 24px; }
+    .toolbar { display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 20px; }
+    .card { background: #fff; border: 1px solid #d9e1ee; border-radius: 18px; padding: 20px; margin-bottom: 16px; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+    .muted { color: #51617d; }
+    .finding { border: 1px solid #d9e1ee; border-radius: 14px; padding: 14px; margin-bottom: 12px; }
+    .finding h3 { margin: 0 0 6px; }
+    pre { white-space: pre-wrap; word-break: break-word; background: #f7f9fc; border: 1px solid #d9e1ee; border-radius: 12px; padding: 12px; }
+    button { border: 0; border-radius: 12px; padding: 10px 14px; font-weight: 600; cursor: pointer; }
+    .primary { background: #0b8f93; color: #fff; }
+    .secondary { background: #eef3fb; color: #162033; }
+    @media print {
+      .toolbar { display: none; }
+      body { background: #fff; }
+      .shell { max-width: none; padding: 0; }
+      .card { border: 1px solid #cfd8e8; box-shadow: none; break-inside: avoid; }
+    }
+    @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="toolbar">
+      <div>
+        <strong>VulnLedger Reportexport</strong><br />
+        <span class="muted">Neues Fenster für Druck, PDF und JSON-Export</span>
+      </div>
+      <div>
+        <button class="secondary" id="btn-json">JSON exportieren</button>
+        <button class="primary" onclick="window.print()">Drucken / Als PDF speichern</button>
+      </div>
+    </div>
+    <div id="app"></div>
+  </div>
+  <script>
+    const raw = sessionStorage.getItem('vulnledger_report_export');
+    const app = document.getElementById('app');
+    if (!raw) {
+      app.innerHTML = '<div class="card"><strong>Keine Report-Konfiguration gefunden.</strong><p class="muted">Bitte den Export direkt aus VulnLedger öffnen.</p></div>';
+    } else {
+      const data = JSON.parse(raw);
+      document.title = `VulnLedger Export – ${data.report.title}`;
+      document.getElementById('btn-json').addEventListener('click', () => {
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `${(data.report.title || 'report').replace(/[^a-z0-9-_]+/gi, '_')}.json`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+      });
+      const findings = (data.findings || []).map((finding) => {
+        const evidence = (data.evidence || []).filter((entry) => entry.findingId === finding.id);
+        const retests = (data.retests || []).filter((entry) => entry.findingId === finding.id);
+        return `
+          <div class="finding">
+            <h3>${finding.id} – ${finding.title}</h3>
+            <p class="muted">${finding.severity} · ${finding.status} · ${data.tenantNameById?.[finding.customerId] || finding.customerId}</p>
+            <p><strong>Target:</strong> ${finding.target}</p>
+            <p><strong>CVSS/CWE:</strong> ${finding.cvssScore || '—'} / ${finding.cwe || '—'}</p>
+            <p><strong>Empfehlung:</strong><br>${finding.recommendation || '—'}</p>
+            <p><strong>Evidence:</strong></p>
+            ${evidence.length ? evidence.map((entry) => `<pre>${entry.title}\n${entry.type}\n${entry.content}</pre>`).join('') : '<p class="muted">Keine Evidence im Exportkontext.</p>'}
+            <p><strong>Retests:</strong></p>
+            ${retests.length ? retests.map((entry) => `<pre>${entry.result} – ${entry.tester}\n${entry.notes}</pre>`).join('') : '<p class="muted">Keine Retests im Exportkontext.</p>'}
+          </div>`;
+      }).join('');
+      app.innerHTML = `
+        <div class="card">
+          <h1>${data.report.title}</h1>
+          <p class="muted">${data.scopeLabel} · Status ${data.report.status} · Generiert am ${new Date(data.generatedAt).toLocaleString('de-DE')}</p>
+          <p>${data.report.summary}</p>
+        </div>
+        <div class="grid">
+          <div class="card">
+            <h2>Reportkontext</h2>
+            <p><strong>Typ:</strong> ${data.report.scopeType === 'group' ? 'Konzernreport' : 'Mandantenreport'}</p>
+            <p><strong>Mandant:</strong> ${data.customer?.name || '—'}</p>
+            <p><strong>Konzern:</strong> ${data.group?.name || '—'}</p>
+            <p><strong>Assessment:</strong> ${data.assessment?.title || '—'}</p>
+          </div>
+          <div class="card">
+            <h2>Lizenz</h2>
+            <p>Dieses Werk steht unter der Apache License 2.0.</p>
+            <p class="muted">Copyright 2026 Daniel Schuh</p>
+          </div>
+        </div>
+        <div class="card">
+          <h2>Findings im Report</h2>
+          ${findings || '<p class="muted">Keine Findings im Exportkontext.</p>'}
+        </div>`;
+    }
+  </script>
+</body>
+</html>
