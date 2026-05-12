@@ -49,7 +49,22 @@ function requireAdmin(req: express.Request, res: express.Response, next: express
 function requireManagerOrAdmin(req: express.Request, res: express.Response, next: express.NextFunction) { if (!req.session.user || !['admin', 'verwalter'].includes(req.session.user.role)) return res.status(403).json({ message: 'Nur für Admin oder Verwalter' }); next(); }
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, backend: getDbBackend() }))
-app.post('/api/auth/login', async (req, res) => { const parsed = loginSchema.safeParse(req.body); if (!parsed.success) return res.status(400).json({ message: 'Ungültige Login-Daten' }); const user = await verifyUser(parsed.data.username, parsed.data.password); if (!user) return res.status(401).json({ message: 'Benutzername oder Passwort falsch' }); req.session.user = { id: user.id, username: user.username, role: user.role, tenantIds: user.tenantIds }; res.json({ user: req.session.user, backend: getDbBackend() }) })
+app.post('/api/auth/login', async (req, res) => {
+  const parsed = loginSchema.safeParse(req.body)
+  if (!parsed.success) return res.status(400).json({ message: 'Ungültige Login-Daten' })
+
+  const user = await verifyUser(parsed.data.username, parsed.data.password)
+  if (!user) return res.status(401).json({ message: 'Benutzername oder Passwort falsch' })
+
+  req.session.user = { id: user.id, username: user.username, role: user.role, tenantIds: user.tenantIds }
+  req.session.save((error) => {
+    if (error) {
+      console.error('session save failed after login', error)
+      return res.status(500).json({ message: 'Session konnte nicht gespeichert werden' })
+    }
+    res.json({ user: req.session.user, backend: getDbBackend() })
+  })
+})
 app.post('/api/auth/logout', (req, res) => { req.session.destroy(() => res.json({ ok: true })) })
 app.get('/api/auth/me', requireAuth, (req, res) => res.json({ user: req.session.user, backend: getDbBackend() }))
 
