@@ -144,7 +144,20 @@ app.use('/api/evidence/files', requireAuth, express.static(evidenceDir))
 startBackupScheduler()
 const appRoot = path.resolve(__dirname, '..', '..')
 const clientDist = path.join(appRoot, 'dist')
-app.use(express.static(clientDist))
-app.get('/{*any}', (_req, res) => { res.sendFile(path.join(clientDist, 'index.html')) })
+app.use(express.static(clientDist, {
+  etag: false,
+  lastModified: false,
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate')
+      return
+    }
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable')
+  },
+}))
+app.get('/{*any}', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate')
+  res.sendFile(path.join(clientDist, 'index.html'))
+})
 const port = Number(process.env.PORT || 3000)
 app.listen(port, () => { console.log(`VulnLedger server listening on ${port}`) })
