@@ -41,19 +41,32 @@ const navItems = [
   { to: '/admin', label: 'Admin', hint: 'User, DB, Backup, Lizenz' },
 ]
 
+async function parseApiJson<T>(response: Response): Promise<T> {
+  if (response.status === 204 || response.status === 205 || response.status === 304) {
+    return null as T
+  }
+
+  const text = await response.text()
+  if (!text.trim()) {
+    return null as T
+  }
+
+  return JSON.parse(text) as T
+}
+
 async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, { ...init, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) } })
   if (!response.ok) {
     let message = `HTTP ${response.status}`
     try {
-      const data = await response.json() as { message?: string }
+      const data = await parseApiJson<{ message?: string }>(response)
       if (data?.message) message = data.message
     } catch {
       // ignore
     }
     throw new Error(message)
   }
-  return response.json() as Promise<T>
+  return parseApiJson<T>(response)
 }
 
 function getErrorMessage(error: unknown, fallback: string) {
