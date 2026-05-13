@@ -57,6 +57,17 @@
         link.click();
         URL.revokeObjectURL(link.href);
       });
+      const summaryParts = String(data.report.summary || '').split(/\n\n+/).map((part) => part.trim()).filter(Boolean);
+      let executiveSummary = '';
+      let methodology = '';
+      let riskSummary = '';
+      let conclusion = '';
+      for (const part of summaryParts) {
+        if (part.startsWith('Methodik:')) methodology = part.replace(/^Methodik:\s*/, '');
+        else if (part.startsWith('Risiko:')) riskSummary = part.replace(/^Risiko:\s*/, '');
+        else if (part.startsWith('Fazit:')) conclusion = part.replace(/^Fazit:\s*/, '');
+        else executiveSummary = executiveSummary ? `${executiveSummary}\n\n${part}` : part;
+      }
       const findings = (data.findings || []).map((finding) => {
         const evidence = (data.evidence || []).filter((entry) => entry.findingId === finding.id);
         const retests = (data.retests || []).filter((entry) => entry.findingId === finding.id);
@@ -64,9 +75,12 @@
           <div class="finding">
             <h3>${finding.id} – ${finding.title}</h3>
             <p class="muted">${finding.severity} · ${finding.status} · ${data.tenantNameById?.[finding.customerId] || finding.customerId}</p>
-            <p><strong>Target:</strong> ${finding.target}</p>
-            <p><strong>CVSS/CWE:</strong> ${finding.cvssScore || '—'} / ${finding.cwe || '—'}</p>
-            <p><strong>Empfehlung:</strong><br>${finding.recommendation || '—'}</p>
+            <div class="grid">
+              <div><strong>Target</strong><pre>${finding.target || '—'}</pre></div>
+              <div><strong>CVSS / CWE</strong><pre>${finding.cvssScore || '—'} / ${finding.cwe || '—'}</pre></div>
+            </div>
+            <p><strong>Empfehlung:</strong></p>
+            <pre>${finding.recommendation || '—'}</pre>
             <p><strong>Evidence:</strong></p>
             ${evidence.length ? evidence.map((entry) => `<pre>${entry.title}\n${entry.type}\n${entry.content}</pre>`).join('') : '<p class="muted">Keine Evidence im Exportkontext.</p>'}
             <p><strong>Retests:</strong></p>
@@ -77,7 +91,26 @@
         <div class="card">
           <h1>${data.report.title}</h1>
           <p class="muted">${data.scopeLabel} · Status ${data.report.status} · Generiert am ${new Date(data.generatedAt).toLocaleString('de-DE')}</p>
-          <p>${data.report.summary}</p>
+        </div>
+        <div class="grid">
+          <div class="card">
+            <h2>Executive Summary</h2>
+            <pre>${executiveSummary || '—'}</pre>
+          </div>
+          <div class="card">
+            <h2>Methodik</h2>
+            <pre>${methodology || '—'}</pre>
+          </div>
+        </div>
+        <div class="grid">
+          <div class="card">
+            <h2>Risiko-Zusammenfassung</h2>
+            <pre>${riskSummary || '—'}</pre>
+          </div>
+          <div class="card">
+            <h2>Fazit / nächste Schritte</h2>
+            <pre>${conclusion || '—'}</pre>
+          </div>
         </div>
         <div class="grid">
           <div class="card">

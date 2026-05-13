@@ -28,6 +28,9 @@ import {
   createReportSqlite,
   createRetestSqlite,
   createUserSqlite,
+  deleteAssessmentSqlite,
+  deleteFindingSqlite,
+  deleteReportSqlite,
   findUserByUsernameSqlite,
   listAssessmentsSqlite,
   listCustomersSqlite,
@@ -37,10 +40,13 @@ import {
   listReportsSqlite,
   listRetestsSqlite,
   listUsersSqlite,
+  updateAssessmentSqlite,
   updateAssessmentStatusSqlite,
   updateCustomerSqlite,
+  updateFindingSqlite,
   updateFindingStatusSqlite,
   updateGroupSqlite,
+  updateReportSqlite,
   updateReportStatusSqlite,
 } from './storage-sqlite.js'
 
@@ -162,6 +168,16 @@ export async function createAssessment(input: Omit<AssessmentRecord, 'createdAt'
   return row
 }
 
+export async function updateAssessment(input: AssessmentRecord) {
+  if (isSqlite()) return updateAssessmentSqlite(input)
+  const db = await getDataDb()
+  const row = db.data.assessments.find((item) => item.id === input.id)
+  if (!row) return null
+  Object.assign(row, input)
+  await db.write()
+  return row
+}
+
 export async function updateAssessmentStatus(id: string, status: AssessmentRecord['status']) {
   if (isSqlite()) return updateAssessmentStatusSqlite(id, status)
   const db = await getDataDb()
@@ -172,11 +188,35 @@ export async function updateAssessmentStatus(id: string, status: AssessmentRecor
   return row
 }
 
+export async function deleteAssessment(id: string) {
+  if (isSqlite()) return deleteAssessmentSqlite(id)
+  const db = await getDataDb()
+  const index = db.data.assessments.findIndex((item) => item.id === id)
+  if (index === -1) return false
+  db.data.assessments.splice(index, 1)
+  db.data.findings = db.data.findings.filter((item) => item.assessmentId !== id)
+  db.data.evidence = db.data.evidence.filter((item) => item.assessmentId !== id)
+  db.data.retests = db.data.retests.filter((item) => item.assessmentId !== id)
+  db.data.reports = db.data.reports.filter((item) => item.assessmentId !== id)
+  await db.write()
+  return true
+}
+
 export async function createFinding(input: Omit<FindingRecord, 'createdAt'>) {
   if (isSqlite()) return createFindingSqlite(input)
   const db = await getDataDb()
   const row: FindingRecord = { ...input, createdAt: new Date().toISOString() }
   db.data.findings.unshift(row)
+  await db.write()
+  return row
+}
+
+export async function updateFinding(input: FindingRecord) {
+  if (isSqlite()) return updateFindingSqlite(input)
+  const db = await getDataDb()
+  const row = db.data.findings.find((item) => item.id === input.id)
+  if (!row) return null
+  Object.assign(row, input)
   await db.write()
   return row
 }
@@ -191,11 +231,33 @@ export async function updateFindingStatus(id: string, status: FindingRecord['sta
   return row
 }
 
+export async function deleteFinding(id: string) {
+  if (isSqlite()) return deleteFindingSqlite(id)
+  const db = await getDataDb()
+  const index = db.data.findings.findIndex((item) => item.id === id)
+  if (index === -1) return false
+  db.data.findings.splice(index, 1)
+  db.data.evidence = db.data.evidence.filter((item) => item.findingId !== id)
+  db.data.retests = db.data.retests.filter((item) => item.findingId !== id)
+  await db.write()
+  return true
+}
+
 export async function createReport(input: Omit<ReportRecord, 'createdAt'>) {
   if (isSqlite()) return createReportSqlite(input)
   const db = await getDataDb()
   const row: ReportRecord = { ...input, createdAt: new Date().toISOString() }
   db.data.reports.unshift(row)
+  await db.write()
+  return row
+}
+
+export async function updateReport(input: ReportRecord) {
+  if (isSqlite()) return updateReportSqlite(input)
+  const db = await getDataDb()
+  const row = db.data.reports.find((item) => item.id === input.id)
+  if (!row) return null
+  Object.assign(row, input)
   await db.write()
   return row
 }
@@ -208,6 +270,16 @@ export async function updateReportStatus(id: string, status: ReportRecord['statu
   row.status = status
   await db.write()
   return row
+}
+
+export async function deleteReport(id: string) {
+  if (isSqlite()) return deleteReportSqlite(id)
+  const db = await getDataDb()
+  const index = db.data.reports.findIndex((item) => item.id === id)
+  if (index === -1) return false
+  db.data.reports.splice(index, 1)
+  await db.write()
+  return true
 }
 
 export async function createEvidence(input: Omit<EvidenceWithFile, 'createdAt'>) {

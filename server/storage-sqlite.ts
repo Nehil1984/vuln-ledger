@@ -183,11 +183,26 @@ export async function createAssessmentSqlite(input: Omit<AssessmentRecord, 'crea
   getDb().prepare('INSERT INTO assessments (id, customer_id, title, type, mode, status, scope, lead_tester, rules_of_engagement, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(row.id, row.customerId, row.title, row.type, row.mode, row.status, row.scope, row.leadTester, row.rulesOfEngagement, row.createdAt)
   return row
 }
+export async function updateAssessmentSqlite(input: AssessmentRecord) {
+  const dbx = getDb()
+  dbx.prepare('UPDATE assessments SET customer_id = ?, title = ?, type = ?, mode = ?, status = ?, scope = ?, lead_tester = ?, rules_of_engagement = ? WHERE id = ?').run(input.customerId, input.title, input.type, input.mode, input.status, input.scope, input.leadTester, input.rulesOfEngagement, input.id)
+  const row = dbx.prepare('SELECT * FROM assessments WHERE id = ?').get(input.id) as { id: string; customer_id: string; title: string; type: string; mode: string; status: string; scope: string; lead_tester: string; rules_of_engagement: string; created_at: string } | undefined
+  return row ? { id: row.id, customerId: row.customer_id, title: row.title, type: row.type, mode: row.mode, status: row.status as AssessmentRecord['status'], scope: row.scope, leadTester: row.lead_tester, rulesOfEngagement: row.rules_of_engagement, createdAt: row.created_at } : null
+}
 export async function updateAssessmentStatusSqlite(id: string, status: AssessmentRecord['status']) {
   const dbx = getDb()
   dbx.prepare('UPDATE assessments SET status = ? WHERE id = ?').run(status, id)
   const row = dbx.prepare('SELECT * FROM assessments WHERE id = ?').get(id) as { id: string; customer_id: string; title: string; type: string; mode: string; status: string; scope: string; lead_tester: string; rules_of_engagement: string; created_at: string } | undefined
   return row ? { id: row.id, customerId: row.customer_id, title: row.title, type: row.type, mode: row.mode, status: row.status as AssessmentRecord['status'], scope: row.scope, leadTester: row.lead_tester, rulesOfEngagement: row.rules_of_engagement, createdAt: row.created_at } : null
+}
+export async function deleteAssessmentSqlite(id: string) {
+  const dbx = getDb()
+  dbx.prepare('DELETE FROM evidence WHERE assessment_id = ?').run(id)
+  dbx.prepare('DELETE FROM retests WHERE assessment_id = ?').run(id)
+  dbx.prepare('DELETE FROM findings WHERE assessment_id = ?').run(id)
+  dbx.prepare('DELETE FROM reports WHERE assessment_id = ?').run(id)
+  const result = dbx.prepare('DELETE FROM assessments WHERE id = ?').run(id)
+  return result.changes > 0
 }
 
 export async function listFindingsSqlite(): Promise<FindingRecord[]> {
@@ -199,11 +214,24 @@ export async function createFindingSqlite(input: Omit<FindingRecord, 'createdAt'
   getDb().prepare('INSERT INTO findings (id, customer_id, assessment_id, title, target, severity, status, cvss_score, cwe, recommendation, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)').run(row.id, row.customerId, row.assessmentId, row.title, row.target, row.severity, row.status, row.cvssScore, row.cwe, row.recommendation, row.createdAt)
   return row
 }
+export async function updateFindingSqlite(input: FindingRecord) {
+  const dbx = getDb()
+  dbx.prepare('UPDATE findings SET customer_id = ?, assessment_id = ?, title = ?, target = ?, severity = ?, status = ?, cvss_score = ?, cwe = ?, recommendation = ? WHERE id = ?').run(input.customerId, input.assessmentId, input.title, input.target, input.severity, input.status, input.cvssScore, input.cwe, input.recommendation, input.id)
+  const row = dbx.prepare('SELECT * FROM findings WHERE id = ?').get(input.id) as { id: string; customer_id: string; assessment_id: string; title: string; target: string; severity: string; status: string; cvss_score: string; cwe: string; recommendation: string; created_at: string } | undefined
+  return row ? { id: row.id, customerId: row.customer_id, assessmentId: row.assessment_id, title: row.title, target: row.target, severity: row.severity as FindingRecord['severity'], status: row.status as FindingRecord['status'], cvssScore: row.cvss_score, cwe: row.cwe, recommendation: row.recommendation, createdAt: row.created_at } : null
+}
 export async function updateFindingStatusSqlite(id: string, status: FindingRecord['status']) {
   const dbx = getDb()
   dbx.prepare('UPDATE findings SET status = ? WHERE id = ?').run(status, id)
   const row = dbx.prepare('SELECT * FROM findings WHERE id = ?').get(id) as { id: string; customer_id: string; assessment_id: string; title: string; target: string; severity: string; status: string; cvss_score: string; cwe: string; recommendation: string; created_at: string } | undefined
   return row ? { id: row.id, customerId: row.customer_id, assessmentId: row.assessment_id, title: row.title, target: row.target, severity: row.severity as FindingRecord['severity'], status: row.status as FindingRecord['status'], cvssScore: row.cvss_score, cwe: row.cwe, recommendation: row.recommendation, createdAt: row.created_at } : null
+}
+export async function deleteFindingSqlite(id: string) {
+  const dbx = getDb()
+  dbx.prepare('DELETE FROM evidence WHERE finding_id = ?').run(id)
+  dbx.prepare('DELETE FROM retests WHERE finding_id = ?').run(id)
+  const result = dbx.prepare('DELETE FROM findings WHERE id = ?').run(id)
+  return result.changes > 0
 }
 
 export async function listReportsSqlite(): Promise<ReportRecord[]> {
@@ -215,11 +243,21 @@ export async function createReportSqlite(input: Omit<ReportRecord, 'createdAt'>)
   getDb().prepare('INSERT INTO reports (id, scope_type, customer_id, group_id, assessment_id, title, status, summary, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)').run(row.id, row.scopeType, row.customerId || null, row.groupId || null, row.assessmentId || null, row.title, row.status, row.summary, row.createdAt)
   return row
 }
+export async function updateReportSqlite(input: ReportRecord) {
+  const dbx = getDb()
+  dbx.prepare('UPDATE reports SET scope_type = ?, customer_id = ?, group_id = ?, assessment_id = ?, title = ?, status = ?, summary = ? WHERE id = ?').run(input.scopeType, input.customerId || null, input.groupId || null, input.assessmentId || null, input.title, input.status, input.summary, input.id)
+  const row = dbx.prepare('SELECT * FROM reports WHERE id = ?').get(input.id) as { id: string; scope_type: string; customer_id?: string; group_id?: string; assessment_id?: string; title: string; status: string; summary: string; created_at: string } | undefined
+  return row ? { id: row.id, scopeType: row.scope_type as ReportRecord['scopeType'], customerId: row.customer_id || undefined, groupId: row.group_id || undefined, assessmentId: row.assessment_id || undefined, title: row.title, status: row.status as ReportRecord['status'], summary: row.summary, createdAt: row.created_at } : null
+}
 export async function updateReportStatusSqlite(id: string, status: ReportRecord['status']) {
   const dbx = getDb()
   dbx.prepare('UPDATE reports SET status = ? WHERE id = ?').run(status, id)
   const row = dbx.prepare('SELECT * FROM reports WHERE id = ?').get(id) as { id: string; scope_type: string; customer_id?: string; group_id?: string; assessment_id?: string; title: string; status: string; summary: string; created_at: string } | undefined
   return row ? { id: row.id, scopeType: row.scope_type as ReportRecord['scopeType'], customerId: row.customer_id || undefined, groupId: row.group_id || undefined, assessmentId: row.assessment_id || undefined, title: row.title, status: row.status as ReportRecord['status'], summary: row.summary, createdAt: row.created_at } : null
+}
+export async function deleteReportSqlite(id: string) {
+  const result = getDb().prepare('DELETE FROM reports WHERE id = ?').run(id)
+  return result.changes > 0
 }
 
 export async function listEvidenceSqlite(): Promise<SqliteEvidenceRow[]> {
