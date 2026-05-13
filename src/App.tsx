@@ -31,7 +31,7 @@ type BackupConfig = { backupDir: string; retention: { hourly: number; daily: num
 type BackupRecord = { fileName: string; createdAt: string; size: number; encrypted: boolean; slot: string; label: string; backend: DbBackend | null; backendMismatch: boolean }
 type ReportExportPayload = { report: Report; scopeLabel: string; generatedAt: string; customer?: Customer | null; group?: Group | null; assessment?: Assessment | null; findings: Finding[]; evidence: Evidence[]; retests: Retest[]; tenantNameById: Record<string, string>; groupNameById: Record<string, string> }
 
-const APP_VERSION = '0.4.1'
+const APP_VERSION = '0.4.2'
 const REPORT_EXPORT_KEY = 'vulnledger_report_export'
 
 const navItems = [
